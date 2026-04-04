@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SaveForge.App.ViewModels"
+             xmlns:forms="clr-namespace:SaveForge.Forms.Views;assembly=SaveForge.Forms"
+             x:Class="SaveForge.App.Views.EditorView"
+             x:DataType="vm:EditorViewModel">
+  <Grid RowDefinitions="Auto,*">
+
+    <!-- File header -->
+    <Border Grid.Row="0"
+            Padding="16,12"
+            Background="{DynamicResource BrushBg2}"
+            BorderBrush="{DynamicResource BrushLine}"
+            BorderThickness="0,0,0,1">
+      <TextBlock Text="{Binding FileName}" Classes="subheading"/>
+    </Border>
+
+    <!-- Schema editor -->
+    <Grid Grid.Row="1" IsVisible="{Binding IsSchemaEditor}">
+      <forms:FormRendererView DataContext="{Binding FormRenderer}"/>
+    </Grid>
+    <!-- Custom plugin view -->
+    <ContentControl Grid.Row="1"
+                    Content="{Binding CustomView}"
+                    IsVisible="{Binding !IsSchemaEditor}"/>
+
+  </Grid>
+</UserControl>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>SaveForge.NewPlugin</RootNamespace>
+    <AssemblyName>SaveForge.NewPlugin</AssemblyName>
+    <!-- Standalone dev tool — not part of the plugin host or SDK build -->
+    <IsDevPlugin>false</IsDevPlugin>
+  </PropertyGroup>
+</Project>

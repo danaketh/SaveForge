@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <!-- Disable TreatWarningsAsErrors for tests — xUnit/Roslyn emit some unavoidable suggestions -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Xunit.SkippableFact" />
+    <ProjectReference Include="..\..\src\SaveForge.SDK\SaveForge.SDK.csproj" />
+    <ProjectReference Include="..\..\src\SaveForge.Core\SaveForge.Core.csproj" />
+    <ProjectReference Include="..\..\src\SaveForge.Infrastructure\SaveForge.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\SaveForge.Security\SaveForge.Security.csproj" />
+    <ProjectReference Include="..\..\src\SaveForge.PluginHost\SaveForge.PluginHost.csproj" />
+    <ProjectReference Include="..\..\src\SaveForge.Store\SaveForge.Store.csproj" />
+    <ProjectReference Include="..\..\src\SaveForge.SamplePlugin.StardewLike\SaveForge.SamplePlugin.StardewLike.csproj" />
+    <ProjectReference Include="..\..\src\SaveForge.Plugin.PlanetCrafter\SaveForge.Plugin.PlanetCrafter.csproj" />
+    <ProjectReference Include="..\..\src\SaveForge.App\SaveForge.App.csproj" />
+  </ItemGroup>
+</Project>

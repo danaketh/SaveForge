@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SaveForge.App.ViewModels"
+             x:Class="SaveForge.App.Controls.InfoBarControl"
+             x:DataType="vm:InfoBarViewModel"
+             IsVisible="{Binding IsVisible}"
+             Background="{DynamicResource BrushBg3}">
+
+  <Border BorderBrush="{DynamicResource BrushLine}"
+          BorderThickness="0,0,0,1">
+    <DockPanel Margin="14,7" LastChildFill="True">
+      <Button DockPanel.Dock="Right"
+              Content="✕"
+              Command="{Binding DismissCommand}"
+              Classes="ghost icon-btn"
+              ToolTip.Tip="Dismiss"/>
+      <TextBlock Text="{Binding Message}"
+                 VerticalAlignment="Center"
+                 Foreground="{DynamicResource BrushAmber}"/>
+    </DockPanel>
+  </Border>
+
+</UserControl>

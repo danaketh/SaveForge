@@ -1,0 +1,44 @@
+<Project>
+  <!--
+    CopyToDevPlugins — copies a plugin's built DLL + manifest.json into the App's
+    _devplugins directory so the app can load it without a separate install step.
+
+    Opt-in per plugin project:
+      <IsDevPlugin>true</IsDevPlugin>
+
+    Output layout (matches PluginHostService.LoadAll scan pattern):
+      {AppBin}/_devplugins/{AssemblyName}/dev/manifest.json
+      {AppBin}/_devplugins/{AssemblyName}/dev/{AssemblyName}.dll
+
+    The folder name ("dev") is arbitrary — PluginHostService reads the real id
+    from manifest.json, not from the directory name.
+  -->
+  <Target Name="CopyToDevPlugins" AfterTargets="Build"
+          Condition="'$(Configuration)' == 'Debug' AND '$(IsDevPlugin)' == 'true'">
+    <PropertyGroup>
+      <_DevPluginDestDir>$(MSBuildThisFileDirectory)src/SaveForge.App/bin/Debug/net8.0/_devplugins/$(AssemblyName)/dev/</_DevPluginDestDir>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(_DevPluginDestDir)" />
+
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll"
+          DestinationFolder="$(_DevPluginDestDir)"
+          SkipUnchangedFiles="true" />
+
+    <Copy SourceFiles="$(ProjectDir)manifest.json"
+          DestinationFolder="$(_DevPluginDestDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(ProjectDir)manifest.json')" />
+
+    <ItemGroup>
+      <_DevPluginAssets Include="$(ProjectDir)Assets\**\*" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_DevPluginAssets)"
+          DestinationFiles="@(_DevPluginAssets->'$(_DevPluginDestDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(_DevPluginAssets)' != ''" />
+
+    <Message Text="[DevPlugin] $(AssemblyName) → $(_DevPluginDestDir)" Importance="High" />
+  </Target>
+</Project>

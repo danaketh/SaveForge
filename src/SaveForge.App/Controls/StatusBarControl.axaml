@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SaveForge.App.ViewModels"
+             x:Class="SaveForge.App.Controls.StatusBarControl"
+             x:DataType="vm:StatusBarViewModel"
+             Height="28"
+             Background="{DynamicResource BrushBg0}">
+
+  <Border BorderBrush="{DynamicResource BrushLine}"
+          BorderThickness="0,1,0,0">
+    <DockPanel Margin="14,0">
+
+      <!-- Right-side static indicators -->
+      <StackPanel DockPanel.Dock="Right"
+                  Orientation="Horizontal"
+                  Spacing="20"
+                  VerticalAlignment="Center">
+        <TextBlock Classes="faint">
+          <Run Foreground="{DynamicResource BrushGreen}">●</Run>
+          <Run> READY</Run>
+        </TextBlock>
+        <TextBlock Classes="faint" Text="UTF-8"/>
+      </StackPanel>
+
+      <!-- Dynamic message -->
+      <TextBlock Text="{Binding Message}"
+                 VerticalAlignment="Center"
+                 Classes="faint"
+                 IsVisible="{Binding HasMessage}"
+                 TextTrimming="CharacterEllipsis"/>
+
+    </DockPanel>
+  </Border>
+
+</UserControl>

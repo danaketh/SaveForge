@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>SaveForge.Store</RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SaveForge.Core\SaveForge.Core.csproj" />
+    <ProjectReference Include="..\SaveForge.Infrastructure\SaveForge.Infrastructure.csproj" />
+    <ProjectReference Include="..\SaveForge.Security\SaveForge.Security.csproj" />
+    <ProjectReference Include="..\SaveForge.PluginHost\SaveForge.PluginHost.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+</Project>

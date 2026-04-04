@@ -1,0 +1,284 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctrl="clr-namespace:SaveForge.App.Controls"
+        xmlns:vm="clr-namespace:SaveForge.App.ViewModels"
+        xmlns:views="clr-namespace:SaveForge.App.Views"
+        x:Class="SaveForge.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="SaveForge"
+        Width="1200" Height="750"
+        MinWidth="900" MinHeight="600"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        WindowDecorations="None"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BrushBg1}">
+
+  <Grid RowDefinitions="30,Auto,*,28">
+
+    <!-- ═══ CUSTOM TITLE BAR ═══ -->
+    <ctrl:TitleBarControl Grid.Row="0"/>
+
+    <!-- ═══ INFO BAR (full width, auto-collapses) ═══ -->
+    <ctrl:InfoBarControl Grid.Row="1" DataContext="{Binding InfoBar}"/>
+
+    <!-- ═══ MAIN AREA ═══ -->
+    <Grid Grid.Row="2" ColumnDefinitions="68,280,*">
+
+      <!-- ── PLUGIN SIDEBAR (68 px) ── -->
+      <Border Grid.Column="0"
+              Background="{DynamicResource BrushBg0}"
+              BorderBrush="{DynamicResource BrushLine}"
+              BorderThickness="0,0,1,0">
+        <DockPanel LastChildFill="False">
+
+          <!-- Plugin glyph buttons -->
+          <ItemsControl DockPanel.Dock="Top"
+                        ItemsSource="{Binding Home.PluginItems}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PluginListItem">
+                <Panel Margin="0,6,0,0" HorizontalAlignment="Center">
+
+                  <!-- Active indicator bar (left edge) -->
+                  <Border Width="3" Height="24"
+                          HorizontalAlignment="Left"
+                          VerticalAlignment="Center"
+                          Margin="-14,0,0,0"
+                          Background="{DynamicResource BrushAmber}"
+                          IsVisible="{Binding IsSelected}"/>
+
+                  <!-- Glyph button -->
+                  <Button Classes="ghost"
+                          Width="40" Height="40"
+                          Padding="0"
+                          IsEnabled="{Binding IsSelectable}"
+                          ToolTip.Tip="{Binding Plugin.Manifest.Name}"
+                          Click="PluginIcon_Click">
+                    <Panel Width="40" Height="40">
+                      <!-- Icon image -->
+                      <Image Source="{Binding Icon}"
+                             IsVisible="{Binding HasIcon}"
+                             Width="40" Height="40"
+                             Stretch="UniformToFill"/>
+                      <!-- Abbreviation fallback -->
+                      <Border Width="40" Height="40"
+                              Background="{DynamicResource BrushAmberGlow}"
+                              IsVisible="{Binding !HasIcon}">
+                        <TextBlock Text="{Binding Abbreviation}"
+                                   FontFamily="{DynamicResource MonoFont}"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource BrushText}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                      </Border>
+                    </Panel>
+                  </Button>
+                </Panel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- Separator -->
+          <Border DockPanel.Dock="Top"
+                  Height="1" Margin="18,8"
+                  Background="{DynamicResource BrushLine}"/>
+
+          <!-- Browse / add plugin (Store) -->
+          <Button DockPanel.Dock="Top"
+                  Classes="ghost"
+                  Width="40" Height="40"
+                  Padding="0"
+                  HorizontalAlignment="Center"
+                  ToolTip.Tip="Plugin Store"
+                  BorderBrush="{DynamicResource BrushLine2}"
+                  BorderThickness="1"
+                  Command="{Binding NavigateToCommand}"
+                  CommandParameter="store">
+            <TextBlock Text="+"
+                       FontSize="18"
+                       Classes="dim"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+          </Button>
+
+          <!-- About (bottom) -->
+          <Button DockPanel.Dock="Bottom"
+                  Classes="ghost"
+                  Width="40" Height="40"
+                  Margin="0,4"
+                  HorizontalAlignment="Center"
+                  ToolTip.Tip="About SaveForge"
+                  Command="{Binding NavigateToCommand}"
+                  CommandParameter="about">
+            <TextBlock Text="i"
+                       FontFamily="{DynamicResource PixelFont}"
+                       FontSize="18"
+                       Classes="faint"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+          </Button>
+
+          <!-- Settings (bottom) -->
+          <Button DockPanel.Dock="Bottom"
+                  Classes="ghost"
+                  Width="40" Height="40"
+                  Margin="0,4"
+                  HorizontalAlignment="Center"
+                  ToolTip.Tip="Settings"
+                  Command="{Binding NavigateToCommand}"
+                  CommandParameter="settings">
+            <TextBlock Text="⚙"
+                       FontSize="15"
+                       Classes="faint"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+          </Button>
+
+        </DockPanel>
+      </Border>
+
+      <!-- ── SAVES / PLUGIN PANEL (280 px) ── -->
+      <Border Grid.Column="1"
+              Background="{DynamicResource BrushBg1}"
+              BorderBrush="{DynamicResource BrushLine}"
+              BorderThickness="0,0,1,0"
+              IsVisible="{Binding IsHome}">
+        <views:HomeView DataContext="{Binding Home}"/>
+      </Border>
+
+      <!-- ── EDITOR / PAGE AREA ── -->
+      <Grid Grid.Column="2">
+
+        <!-- Home context: toolbar + editor or placeholder -->
+        <Grid IsVisible="{Binding IsHome}" RowDefinitions="44,36,*,28">
+
+          <!-- Toolbar -->
+          <Border Grid.Row="0"
+                  Padding="16,0"
+                  Background="{DynamicResource BrushBg1}"
+                  BorderBrush="{DynamicResource BrushLine}"
+                  BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0"
+                         VerticalAlignment="Center"
+                         Classes="subheading">
+                <TextBlock.Text>
+                  <MultiBinding StringFormat="{}{0}">
+                    <Binding Path="CurrentEditor.FileName" FallbackValue="No file open"/>
+                  </MultiBinding>
+                </TextBlock.Text>
+              </TextBlock>
+
+              <StackPanel Grid.Column="1"
+                          Orientation="Horizontal"
+                          Spacing="6"
+                          VerticalAlignment="Center">
+                <Button Classes="sm" Content="⏱ History" IsEnabled="False"/>
+                <Border Width="1" Height="20"
+                        Background="{DynamicResource BrushLine}"
+                        Margin="2,0"/>
+                <Button Classes="sm primary"
+                        Content="💾 Save"
+                        IsEnabled="{Binding IsEditorOpen}"
+                        Command="{Binding CurrentEditor.SaveCommand}"/>
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- Tab bar placeholder (plugin drives content, tabs are decorative) -->
+          <Border Grid.Row="1"
+                  Background="{DynamicResource BrushBg1}"
+                  BorderBrush="{DynamicResource BrushLine}"
+                  BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal">
+              <Button Classes="ghost sm"
+                      Content="Editor"
+                      Height="36"
+                      Padding="16,0"
+                      IsVisible="{Binding IsEditorOpen}"
+                      Foreground="{DynamicResource BrushAmber}"
+                      BorderThickness="0,0,0,2"
+                      BorderBrush="{DynamicResource BrushAmber}"/>
+            </StackPanel>
+          </Border>
+
+          <!-- Content: editor or placeholder -->
+          <ScrollViewer Grid.Row="2"
+                        Background="{DynamicResource BrushBg1}">
+            <Grid>
+              <!-- Placeholder -->
+              <StackPanel IsVisible="{Binding !IsEditorOpen}"
+                          VerticalAlignment="Center"
+                          HorizontalAlignment="Center"
+                          Spacing="8"
+                          Margin="0,80">
+                <TextBlock Text="No save file open."
+                           Classes="dim"
+                           FontSize="14"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="Select a plugin from the left, then open a save."
+                           Classes="faint"
+                           HorizontalAlignment="Center"/>
+              </StackPanel>
+
+              <!-- Editor -->
+              <ContentControl IsVisible="{Binding IsEditorOpen}"
+                              Content="{Binding CurrentEditor}">
+                <ContentControl.DataTemplates>
+                  <DataTemplate DataType="{x:Type vm:EditorViewModel}">
+                    <views:EditorView/>
+                  </DataTemplate>
+                </ContentControl.DataTemplates>
+              </ContentControl>
+            </Grid>
+          </ScrollViewer>
+
+          <!-- Editor status bar -->
+          <Border Grid.Row="3"
+                  Padding="14,0"
+                  Background="{DynamicResource BrushBg0}"
+                  BorderBrush="{DynamicResource BrushLine}"
+                  BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="20" VerticalAlignment="Center">
+              <TextBlock Classes="faint">
+                <Run Foreground="{DynamicResource BrushGreen}">●</Run>
+                <Run> READY</Run>
+              </TextBlock>
+              <TextBlock Classes="faint"
+                         Text="{Binding StatusBar.Message}"
+                         IsVisible="{Binding StatusBar.HasMessage}"/>
+            </StackPanel>
+          </Border>
+
+        </Grid>
+
+      </Grid>
+
+      <!-- Other pages: Store, Settings, About, PluginDetail (2-column: sidebar + full remaining) -->
+      <ContentControl Grid.Column="1" Grid.ColumnSpan="2"
+                      IsVisible="{Binding !IsHome}"
+                      Content="{Binding CurrentPage}">
+        <ContentControl.DataTemplates>
+          <DataTemplate DataType="{x:Type vm:StoreViewModel}">
+            <views:StoreView/>
+          </DataTemplate>
+          <DataTemplate DataType="{x:Type vm:PluginDetailViewModel}">
+            <views:PluginDetailView/>
+          </DataTemplate>
+          <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+            <views:SettingsView/>
+          </DataTemplate>
+          <DataTemplate DataType="{x:Type vm:AboutViewModel}">
+            <views:AboutView/>
+          </DataTemplate>
+        </ContentControl.DataTemplates>
+      </ContentControl>
+
+    </Grid>
+
+    <!-- ═══ APP STATUS BAR ═══ -->
+    <ctrl:StatusBarControl Grid.Row="3" DataContext="{Binding StatusBar}"/>
+
+  </Grid>
+</Window>

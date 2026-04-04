@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SaveForge.App.ViewModels"
+             xmlns:core="clr-namespace:SaveForge.Core.Models;assembly=SaveForge.Core"
+             x:Class="SaveForge.App.Views.StoreView"
+             x:DataType="vm:StoreViewModel">
+  <Grid RowDefinitions="Auto,Auto,*">
+
+    <!-- Header -->
+    <Border Grid.Row="0"
+            Padding="16,14,16,12"
+            Background="{DynamicResource BrushBg2}"
+            BorderBrush="{DynamicResource BrushLine}"
+            BorderThickness="0,0,0,1">
+      <TextBlock Text="Plugin Store" Classes="heading"/>
+    </Border>
+
+    <!-- Search -->
+    <Border Grid.Row="1"
+            Padding="12,8"
+            Background="{DynamicResource BrushBg0}"
+            BorderBrush="{DynamicResource BrushLine}"
+            BorderThickness="0,0,0,1">
+      <TextBox Text="{Binding SearchText}" PlaceholderText="filter plugins..."/>
+    </Border>
+
+    <!-- Error -->
+    <TextBlock Grid.Row="2"
+               Text="{Binding ErrorMessage}"
+               Classes="red"
+               IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+               Margin="16"/>
+
+    <!-- Plugin list -->
+    <ScrollViewer Grid.Row="2"
+                  IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNullOrEmpty}}">
+      <ItemsControl ItemsSource="{Binding DisplayedEntries}" Margin="12">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="core:CatalogEntry">
+            <Border Background="{DynamicResource BrushBg2}"
+                    BorderBrush="{DynamicResource BrushLine}"
+                    BorderThickness="1"
+                    CornerRadius="0"
+                    Padding="16,12"
+                    Margin="0,0,0,6">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="4">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                  <TextBlock Text="{Binding Author}" Classes="dim" FontSize="11"/>
+                  <TextBlock Text="{Binding Description}" TextWrapping="Wrap"/>
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Border Background="{DynamicResource BrushAmber}"
+                            CornerRadius="0" Padding="6,2"
+                            IsVisible="{Binding HasUpdate}">
+                      <TextBlock Text="Update Available" FontSize="10" Foreground="#1A1000"/>
+                    </Border>
+                    <Border Background="{DynamicResource BrushGreen}"
+                            CornerRadius="0" Padding="6,2"
+                            IsVisible="{Binding IsInstalled}">
+                      <TextBlock Text="Installed" FontSize="10" Foreground="#0A1A0A"/>
+                    </Border>
+                  </StackPanel>
+                </StackPanel>
+                <Button Grid.Column="1" Content="Install"
+                        IsVisible="{Binding !IsInstalled}"
+                        Classes="primary sm"
+                        VerticalAlignment="Top"/>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+  </Grid>
+</UserControl>

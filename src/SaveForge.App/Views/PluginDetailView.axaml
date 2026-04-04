@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SaveForge.App.ViewModels"
+             x:Class="SaveForge.App.Views.PluginDetailView"
+             x:DataType="vm:PluginDetailViewModel">
+  <Grid RowDefinitions="Auto,*">
+
+    <!-- Header -->
+    <Border Grid.Row="0"
+            Padding="16,14,16,12"
+            Background="{DynamicResource BrushBg2}"
+            BorderBrush="{DynamicResource BrushLine}"
+            BorderThickness="0,0,0,1">
+      <StackPanel Spacing="2">
+        <TextBlock Text="{Binding Entry.Name}" Classes="heading"/>
+        <TextBlock Text="{Binding Entry.Author}" Classes="dim" FontSize="11"/>
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer Grid.Row="1">
+      <StackPanel Margin="24,16" Spacing="12">
+        <TextBlock Text="{Binding Entry.Description}" TextWrapping="Wrap"/>
+        <TextBlock Classes="faint"
+                   Text="{Binding Entry.LatestVersion, StringFormat='Latest: {0}'}"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Install" Command="{Binding InstallCommand}"
+                  Classes="primary sm"
+                  IsVisible="{Binding !Entry.IsInstalled}"/>
+          <Button Content="Update" Command="{Binding UpdateCommand}"
+                  Classes="primary sm"
+                  IsVisible="{Binding Entry.HasUpdate}"/>
+          <Button Content="Remove" Command="{Binding RemoveCommand}"
+                  Classes="danger sm"
+                  IsVisible="{Binding Entry.IsInstalled}"/>
+        </StackPanel>
+        <TextBlock Text="{Binding StatusMessage}"
+                   Classes="amber"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+      </StackPanel>
+    </ScrollViewer>
+
+  </Grid>
+</UserControl>

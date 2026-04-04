@@ -1,0 +1,323 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SaveForge.Plugin.PlanetCrafter.ViewModels"
+             x:Class="SaveForge.Plugin.PlanetCrafter.Views.PlanetCrafterEditorView"
+             x:DataType="vm:PlanetCrafterEditorViewModel">
+
+  <Grid RowDefinitions="*,Auto">
+
+    <TabControl Grid.Row="0">
+
+      <!-- ═══════════════════════════════════════════════════════════
+           Characters tab
+           ═══════════════════════════════════════════════════════════ -->
+      <TabItem Header="Characters">
+        <DockPanel>
+
+          <!-- Player selector -->
+          <Border DockPanel.Dock="Top"
+                  Padding="12,8"
+                  BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                  BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <TextBlock Text="Character:"
+                         VerticalAlignment="Center"
+                         FontWeight="SemiBold" />
+              <ComboBox ItemsSource="{Binding Players}"
+                        SelectedItem="{Binding SelectedPlayer}"
+                        MinWidth="220">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:PlayerViewModel">
+                    <TextBlock Text="{Binding DisplayName}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+          </Border>
+
+          <!-- Character detail (master-detail via ContentControl) -->
+          <ContentControl DockPanel.Dock="Bottom"
+                          Content="{Binding SelectedPlayer}">
+            <ContentControl.ContentTemplate>
+              <DataTemplate x:DataType="vm:PlayerViewModel">
+                <ScrollViewer>
+                  <StackPanel Margin="12" Spacing="4">
+
+                    <!-- ── Stats ─────────────────────────────────── -->
+                    <TextBlock Text="Stats"
+                               FontWeight="SemiBold"
+                               FontSize="15"
+                               Margin="0,0,0,6" />
+
+                    <Grid ColumnDefinitions="130,220"
+                          RowDefinitions="Auto,Auto,Auto,Auto"
+                          HorizontalAlignment="Left">
+                      <TextBlock Grid.Row="0" Grid.Column="0"
+                                 Text="Health"
+                                 VerticalAlignment="Center"
+                                 Margin="0,4" />
+                      <NumericUpDown Grid.Row="0" Grid.Column="1"
+                                     Value="{Binding Health}"
+                                     Minimum="0" Maximum="100"
+                                     FormatString="F1"
+                                     Margin="0,4" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0"
+                                 Text="Oxygen"
+                                 VerticalAlignment="Center"
+                                 Margin="0,4" />
+                      <NumericUpDown Grid.Row="1" Grid.Column="1"
+                                     Value="{Binding Oxygen}"
+                                     Minimum="0" Maximum="370"
+                                     FormatString="F1"
+                                     Margin="0,4" />
+
+                      <TextBlock Grid.Row="2" Grid.Column="0"
+                                 Text="Thirst"
+                                 VerticalAlignment="Center"
+                                 Margin="0,4" />
+                      <NumericUpDown Grid.Row="2" Grid.Column="1"
+                                     Value="{Binding Thirst}"
+                                     Minimum="0" Maximum="100"
+                                     FormatString="F1"
+                                     Margin="0,4" />
+
+                      <TextBlock Grid.Row="3" Grid.Column="0"
+                                 Text="Toxic"
+                                 VerticalAlignment="Center"
+                                 Margin="0,4" />
+                      <NumericUpDown Grid.Row="3" Grid.Column="1"
+                                     Value="{Binding Toxic}"
+                                     Minimum="0" Maximum="100"
+                                     FormatString="F1"
+                                     Margin="0,4" />
+                    </Grid>
+
+                    <!-- ── Equipment ─────────────────────────────── -->
+                    <TextBlock Text="Equipment"
+                               FontWeight="SemiBold"
+                               FontSize="15"
+                               Margin="0,16,0,6" />
+
+                    <ItemsControl ItemsSource="{Binding EquipmentItems}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:InventoryItemViewModel">
+                          <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding DisplayName}"
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Column="1"
+                                    Content="Remove"
+                                    Command="{Binding RemoveCommand}"
+                                    Margin="8,0,0,0" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Add equipment row -->
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                      <ComboBox Grid.Column="0"
+                                ItemsSource="{Binding AllKnownItems}"
+                                SelectedItem="{Binding SelectedNewEquipmentItem}"
+                                PlaceholderText="Select item to equip…">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate x:DataType="vm:KnownItem">
+                            <TextBlock Text="{Binding DisplayName}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <Button Grid.Column="1"
+                              Content="Add"
+                              Command="{Binding AddEquipmentItemCommand}"
+                              Margin="8,0,0,0" />
+                    </Grid>
+
+                    <!-- ── Inventory ──────────────────────────────── -->
+                    <TextBlock Text="Inventory"
+                               FontWeight="SemiBold"
+                               FontSize="15"
+                               Margin="0,16,0,6" />
+
+                    <ItemsControl ItemsSource="{Binding InventoryItems}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:InventoryItemViewModel">
+                          <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding DisplayName}"
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Column="1"
+                                    Content="Remove"
+                                    Command="{Binding RemoveCommand}"
+                                    Margin="8,0,0,0" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Add inventory row -->
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                      <ComboBox Grid.Column="0"
+                                ItemsSource="{Binding AllKnownItems}"
+                                SelectedItem="{Binding SelectedNewInventoryItem}"
+                                PlaceholderText="Select item to add…">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate x:DataType="vm:KnownItem">
+                            <TextBlock Text="{Binding DisplayName}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <Button Grid.Column="1"
+                              Content="Add"
+                              Command="{Binding AddInventoryItemCommand}"
+                              Margin="8,0,0,0" />
+                    </Grid>
+
+                  </StackPanel>
+                </ScrollViewer>
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+
+        </DockPanel>
+      </TabItem>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           Terra Tokens tab
+           ═══════════════════════════════════════════════════════════ -->
+      <TabItem Header="Terra Tokens">
+        <ScrollViewer>
+          <StackPanel Margin="12" Spacing="4">
+
+            <TextBlock Text="Currency"
+                       FontWeight="SemiBold"
+                       FontSize="15"
+                       Margin="0,0,0,6" />
+
+            <Grid ColumnDefinitions="200,220"
+                  RowDefinitions="Auto,Auto"
+                  HorizontalAlignment="Left">
+              <TextBlock Grid.Row="0" Grid.Column="0"
+                         Text="Terra Tokens"
+                         VerticalAlignment="Center"
+                         Margin="0,4" />
+              <NumericUpDown Grid.Row="0" Grid.Column="1"
+                             Value="{Binding TerraTokens}"
+                             Minimum="0"
+                             FormatString="F0"
+                             Margin="0,4" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0"
+                         Text="All-Time Terra Tokens"
+                         VerticalAlignment="Center"
+                         Margin="0,4"
+                         Opacity="0.7" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1"
+                             Value="{Binding AllTimeTerraTokens}"
+                             IsReadOnly="True"
+                             FormatString="F0"
+                             Margin="0,4"
+                             Opacity="0.7" />
+            </Grid>
+
+            <TextBlock Text="Unlocked Groups"
+                       FontWeight="SemiBold"
+                       FontSize="15"
+                       Margin="0,16,0,6" />
+            <TextBox Text="{Binding UnlockedGroups}"
+                     IsReadOnly="True"
+                     MaxWidth="600"
+                     HorizontalAlignment="Left"
+                     AcceptsReturn="False"
+                     Opacity="0.7" />
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           Planet State tab
+           ═══════════════════════════════════════════════════════════ -->
+      <TabItem Header="Planet State">
+        <ScrollViewer>
+          <StackPanel Margin="12" Spacing="4">
+
+            <TextBlock Text="Terraforming Levels"
+                       FontWeight="SemiBold"
+                       FontSize="15"
+                       Margin="0,0,0,6" />
+
+            <Grid ColumnDefinitions="130,220"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                  HorizontalAlignment="Left">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="Oxygen"   VerticalAlignment="Center" Margin="0,4" />
+              <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding OxygenLevel}"   Minimum="0" FormatString="F2" Margin="0,4" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="Heat"     VerticalAlignment="Center" Margin="0,4" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding HeatLevel}"     Minimum="0" FormatString="F2" Margin="0,4" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="Pressure" VerticalAlignment="Center" Margin="0,4" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding PressureLevel}" Minimum="0" FormatString="F2" Margin="0,4" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" Text="Plants"   VerticalAlignment="Center" Margin="0,4" />
+              <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding PlantsLevel}"   Minimum="0" FormatString="F2" Margin="0,4" />
+
+              <TextBlock Grid.Row="4" Grid.Column="0" Text="Insects"  VerticalAlignment="Center" Margin="0,4" />
+              <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding InsectsLevel}"  Minimum="0" FormatString="F2" Margin="0,4" />
+
+              <TextBlock Grid.Row="5" Grid.Column="0" Text="Animals"  VerticalAlignment="Center" Margin="0,4" />
+              <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding AnimalsLevel}"  Minimum="0" FormatString="F2" Margin="0,4" />
+            </Grid>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           Save Info tab
+           ═══════════════════════════════════════════════════════════ -->
+      <TabItem Header="Save Info">
+        <ScrollViewer>
+          <StackPanel Margin="12" Spacing="4">
+
+            <TextBlock Text="General"
+                       FontWeight="SemiBold"
+                       FontSize="15"
+                       Margin="0,0,0,6" />
+
+            <Grid ColumnDefinitions="160,300"
+                  RowDefinitions="Auto,Auto,Auto"
+                  HorizontalAlignment="Left">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="Display Name"    VerticalAlignment="Center" Margin="0,4" />
+              <TextBox   Grid.Row="0" Grid.Column="1" Text="{Binding SaveDisplayName}" MaxLength="64" Margin="0,4" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="Planet ID"       VerticalAlignment="Center" Margin="0,4" Opacity="0.7" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PlanetId}"  VerticalAlignment="Center" Margin="0,4" Opacity="0.7" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="Crafted Objects" VerticalAlignment="Center" Margin="0,4" Opacity="0.7" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CraftedObjects}" VerticalAlignment="Center" Margin="0,4" Opacity="0.7" />
+            </Grid>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+    </TabControl>
+
+    <!-- ── Save bar ──────────────────────────────────────────────── -->
+    <Grid Grid.Row="1"
+          ColumnDefinitions="*,Auto"
+          Margin="8">
+      <TextBlock Grid.Column="0"
+                 Text="{Binding SaveStatus}"
+                 VerticalAlignment="Center"
+                 Opacity="0.7"
+                 TextTrimming="CharacterEllipsis" />
+      <Button Grid.Column="1"
+              Content="Save"
+              Command="{Binding SaveCommand}"
+              Classes="accent" />
+    </Grid>
+
+  </Grid>
+</UserControl>

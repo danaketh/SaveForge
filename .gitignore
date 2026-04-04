@@ -1,0 +1,33 @@
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.DotSettings.user
+.vs/
+
+## Dev plugin staging area (populated by CopyToDevPlugins MSBuild target)
+_devplugins/
+
+## NuGet packages restored locally
+packages/
+*.nupkg
+*.snupkg
+
+## Test results and coverage
+TestResults/
+coverage*/
+*.coveragexml
+*.cobertura.xml
+
+## OS artefacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## Rider / JetBrains
+.idea/
+
+## VS Code
+.vscode/

@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SaveForge.Forms.ViewModels"
+             xmlns:sdk="clr-namespace:SaveForge.SDK.Schema;assembly=SaveForge.SDK"
+             x:Class="SaveForge.Forms.Views.FormRendererView"
+             x:DataType="vm:FormRendererViewModel">
+
+  <Grid RowDefinitions="*,Auto">
+
+    <!-- Page tabs -->
+    <TabControl Grid.Row="0"
+                ItemsSource="{Binding Pages}"
+                SelectedItem="{Binding SelectedPage}">
+      <TabControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:FormPageViewModel">
+          <TextBlock Text="{Binding Title}" />
+        </DataTemplate>
+      </TabControl.ItemTemplate>
+      <TabControl.ContentTemplate>
+        <DataTemplate x:DataType="vm:FormPageViewModel">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Sections}" Margin="8">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:FormSectionViewModel">
+                  <StackPanel Margin="0,0,0,12">
+                    <TextBlock Text="{Binding Heading}"
+                               FontWeight="SemiBold"
+                               IsVisible="{Binding Heading, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               Margin="0,0,0,4" />
+                    <ItemsControl ItemsSource="{Binding Fields}">
+                      <ItemsControl.DataTemplates>
+
+                        <!-- TextField -->
+                        <DataTemplate DataType="{x:Type vm:TextFieldViewModel}">
+                          <StackPanel IsVisible="{Binding IsVisible}" Margin="0,4">
+                            <TextBlock Text="{Binding Definition.Label}" />
+                            <TextBox Text="{Binding Value}"
+                                     IsReadOnly="{Binding Definition.IsReadOnly}"
+                                     PlaceholderText="{Binding Definition.Description}" />
+                            <TextBlock Text="{Binding ValidationError}"
+                                       Foreground="#ff4757"
+                                       IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                          </StackPanel>
+                        </DataTemplate>
+
+                        <!-- NumericField -->
+                        <DataTemplate DataType="{x:Type vm:NumericFieldViewModel}">
+                          <StackPanel IsVisible="{Binding IsVisible}" Margin="0,4">
+                            <TextBlock Text="{Binding Definition.Label}" />
+                            <NumericUpDown Value="{Binding Value}"
+                                           IsReadOnly="{Binding Definition.IsReadOnly}"
+                                           FormatString="{Binding DecimalPlaces, StringFormat='F{0}'}" />
+                            <TextBlock Text="{Binding ValidationError}"
+                                       Foreground="#ff4757"
+                                       IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                          </StackPanel>
+                        </DataTemplate>
+
+                        <!-- CheckboxField -->
+                        <DataTemplate DataType="{x:Type vm:CheckboxFieldViewModel}">
+                          <StackPanel IsVisible="{Binding IsVisible}" Margin="0,4" Orientation="Horizontal">
+                            <CheckBox IsChecked="{Binding Value}"
+                                      IsEnabled="{Binding !Definition.IsReadOnly}"
+                                      Content="{Binding Definition.Label}" />
+                          </StackPanel>
+                        </DataTemplate>
+
+                        <!-- EnumField -->
+                        <DataTemplate DataType="{x:Type vm:EnumFieldViewModel}">
+                          <StackPanel IsVisible="{Binding IsVisible}" Margin="0,4">
+                            <TextBlock Text="{Binding Definition.Label}" />
+                            <ComboBox ItemsSource="{Binding Options}"
+                                      SelectedItem="{Binding SelectedOption}"
+                                      IsEnabled="{Binding !Definition.IsReadOnly}">
+                              <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="sdk:EnumOption">
+                                  <TextBlock Text="{Binding Display}" />
+                                </DataTemplate>
+                              </ComboBox.ItemTemplate>
+                            </ComboBox>
+                          </StackPanel>
+                        </DataTemplate>
+
+                        <!-- ReadOnlyField -->
+                        <DataTemplate DataType="{x:Type vm:ReadOnlyFieldViewModel}">
+                          <StackPanel IsVisible="{Binding IsVisible}" Margin="0,4">
+                            <TextBlock Text="{Binding Definition.Label}" />
+                            <TextBlock Text="{Binding DisplayValue}" Opacity="0.7" />
+                          </StackPanel>
+                        </DataTemplate>
+
+                      </ItemsControl.DataTemplates>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DataTemplate>
+      </TabControl.ContentTemplate>
+    </TabControl>
+
+    <!-- Save button -->
+    <Button Grid.Row="1"
+            Content="Save"
+            Command="{Binding SaveCommand}"
+            HorizontalAlignment="Right"
+            Margin="8"
+            Classes="accent" />
+
+  </Grid>
+</UserControl>

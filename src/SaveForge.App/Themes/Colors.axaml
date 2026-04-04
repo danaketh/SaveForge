@@ -1,0 +1,137 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ═══════════════════════════════════════════════
+       SE PALETTE — retro CRT / amber phosphor
+  ═══════════════════════════════════════════════ -->
+  <Color x:Key="Bg0Color">#0B0D14</Color>
+  <Color x:Key="Bg1Color">#12151F</Color>
+  <Color x:Key="Bg2Color">#1A1E2B</Color>
+  <Color x:Key="Bg3Color">#232838</Color>
+  <Color x:Key="Bg4Color">#2D3346</Color>
+  <Color x:Key="LineColor">#2A3044</Color>
+  <Color x:Key="Line2Color">#3A4159</Color>
+  <Color x:Key="SETextColor">#E6E9F2</Color>
+  <Color x:Key="TextDimColor">#9AA2B8</Color>
+  <Color x:Key="TextFaintColor">#5B6276</Color>
+  <Color x:Key="AmberColor">#F5B942</Color>
+  <Color x:Key="AmberDimColor">#C68F2B</Color>
+  <Color x:Key="AmberGlowColor">#38F5B942</Color>
+  <Color x:Key="GreenColor">#6FD479</Color>
+  <Color x:Key="RedColor">#E5484D</Color>
+  <Color x:Key="BlueColor">#6FB4FF</Color>
+  <Color x:Key="PurpleColor">#B794F4</Color>
+
+  <!-- SE Brushes -->
+  <SolidColorBrush x:Key="BrushBg0"       Color="{StaticResource Bg0Color}"/>
+  <SolidColorBrush x:Key="BrushBg1"       Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="BrushBg2"       Color="{StaticResource Bg2Color}"/>
+  <SolidColorBrush x:Key="BrushBg3"       Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="BrushBg4"       Color="{StaticResource Bg4Color}"/>
+  <SolidColorBrush x:Key="BrushLine"      Color="{StaticResource LineColor}"/>
+  <SolidColorBrush x:Key="BrushLine2"     Color="{StaticResource Line2Color}"/>
+  <SolidColorBrush x:Key="BrushText"      Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="BrushTextDim"   Color="{StaticResource TextDimColor}"/>
+  <SolidColorBrush x:Key="BrushTextFaint" Color="{StaticResource TextFaintColor}"/>
+  <SolidColorBrush x:Key="BrushAmber"     Color="{StaticResource AmberColor}"/>
+  <SolidColorBrush x:Key="BrushAmberDim"  Color="{StaticResource AmberDimColor}"/>
+  <SolidColorBrush x:Key="BrushAmberGlow" Color="{StaticResource AmberGlowColor}"/>
+  <SolidColorBrush x:Key="BrushGreen"     Color="{StaticResource GreenColor}"/>
+  <SolidColorBrush x:Key="BrushRed"       Color="{StaticResource RedColor}"/>
+  <SolidColorBrush x:Key="BrushBlue"      Color="{StaticResource BlueColor}"/>
+  <SolidColorBrush x:Key="BrushPurple"    Color="{StaticResource PurpleColor}"/>
+
+  <!-- Semantic backward-compat mappings -->
+  <SolidColorBrush x:Key="BrushBackground"      Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="BrushSurface"          Color="{StaticResource Bg2Color}"/>
+  <SolidColorBrush x:Key="BrushSurfaceElevated"  Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="BrushAccent"           Color="{StaticResource AmberColor}"/>
+  <SolidColorBrush x:Key="BrushTextPrimary"      Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="BrushTextSecondary"    Color="{StaticResource TextDimColor}"/>
+  <SolidColorBrush x:Key="BrushBorder"           Color="{StaticResource LineColor}"/>
+  <SolidColorBrush x:Key="BrushDanger"           Color="{StaticResource RedColor}"/>
+  <SolidColorBrush x:Key="BrushSuccess"          Color="{StaticResource GreenColor}"/>
+
+  <!-- Font families (bundled assets, fallback to system) -->
+  <FontFamily x:Key="MonoFont">avares://SaveForge.App/Assets/Fonts#JetBrains Mono,Cascadia Mono,Consolas,Courier New</FontFamily>
+  <FontFamily x:Key="PixelFont">avares://SaveForge.App/Assets/Fonts#VT323,Consolas,Courier New</FontFamily>
+
+  <!-- ═══════════════════════════════════════════════
+       FLUENT THEME OVERRIDES
+  ═══════════════════════════════════════════════ -->
+
+  <!-- Accent -->
+  <Color x:Key="SystemAccentColor">#F5B942</Color>
+  <Color x:Key="SystemAccentColorLight1">#FFC954</Color>
+  <Color x:Key="SystemAccentColorLight2">#FFD479</Color>
+  <Color x:Key="SystemAccentColorLight3">#FFE4A0</Color>
+  <Color x:Key="SystemAccentColorDark1">#C68F2B</Color>
+  <Color x:Key="SystemAccentColorDark2">#8A6316</Color>
+  <Color x:Key="SystemAccentColorDark3">#5C4010</Color>
+
+  <!-- Button -->
+  <SolidColorBrush x:Key="ButtonBackground"             Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="ButtonBackgroundPointerOver"  Color="{StaticResource Bg4Color}"/>
+  <SolidColorBrush x:Key="ButtonBackgroundPressed"      Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="ButtonBackgroundDisabled"     Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="ButtonForeground"             Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="ButtonForegroundPointerOver"  Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="ButtonForegroundPressed"      Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="ButtonForegroundDisabled"     Color="{StaticResource TextFaintColor}"/>
+  <SolidColorBrush x:Key="ButtonBorderBrush"            Color="{StaticResource Line2Color}"/>
+  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#4A516A"/>
+  <SolidColorBrush x:Key="ButtonBorderBrushPressed"     Color="{StaticResource Line2Color}"/>
+  <SolidColorBrush x:Key="ButtonBorderBrushDisabled"    Color="{StaticResource LineColor}"/>
+
+  <!-- TextBox -->
+  <SolidColorBrush x:Key="TextControlBackground"              Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="TextControlBackgroundPointerOver"   Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="TextControlBackgroundFocused"       Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="TextControlBackgroundDisabled"      Color="{StaticResource Bg0Color}"/>
+  <SolidColorBrush x:Key="TextControlForeground"              Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="TextControlForegroundPointerOver"   Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="TextControlForegroundFocused"       Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="TextControlForegroundDisabled"      Color="{StaticResource TextFaintColor}"/>
+  <SolidColorBrush x:Key="TextControlBorderBrush"             Color="{StaticResource Line2Color}"/>
+  <SolidColorBrush x:Key="TextControlBorderBrushPointerOver"  Color="{StaticResource Line2Color}"/>
+  <SolidColorBrush x:Key="TextControlBorderBrushFocused"      Color="{StaticResource AmberColor}"/>
+  <SolidColorBrush x:Key="TextControlBorderBrushDisabled"     Color="{StaticResource LineColor}"/>
+  <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="{StaticResource AmberGlowColor}"/>
+  <SolidColorBrush x:Key="TextControlCaretForeground"         Color="{StaticResource AmberColor}"/>
+  <SolidColorBrush x:Key="TextControlPlaceholderForeground"   Color="{StaticResource TextFaintColor}"/>
+
+  <!-- ComboBox -->
+  <SolidColorBrush x:Key="ComboBoxBackground"                    Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver"         Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="ComboBoxBackgroundFocused"             Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="ComboBoxBackgroundDisabled"            Color="{StaticResource Bg0Color}"/>
+  <SolidColorBrush x:Key="ComboBoxForeground"                    Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="ComboBoxForegroundPointerOver"         Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="ComboBoxForegroundFocused"             Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="ComboBoxForegroundDisabled"            Color="{StaticResource TextFaintColor}"/>
+  <SolidColorBrush x:Key="ComboBoxBorderBrush"                   Color="{StaticResource Line2Color}"/>
+  <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver"        Color="{StaticResource Line2Color}"/>
+  <SolidColorBrush x:Key="ComboBoxBorderBrushFocused"            Color="{StaticResource AmberColor}"/>
+  <SolidColorBrush x:Key="ComboBoxDropDownBackground"            Color="{StaticResource Bg2Color}"/>
+  <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush"           Color="{StaticResource Line2Color}"/>
+  <SolidColorBrush x:Key="ComboBoxItemBackground"                Color="{StaticResource Bg2Color}"/>
+  <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver"     Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected"        Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="ComboBoxItemForeground"                Color="{StaticResource SETextColor}"/>
+  <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver"     Color="{StaticResource SETextColor}"/>
+
+  <!-- ScrollBar -->
+  <SolidColorBrush x:Key="ScrollBarThumbBackground"             Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="ScrollBarThumbBackgroundPointerOver"  Color="{StaticResource Bg4Color}"/>
+  <SolidColorBrush x:Key="ScrollBarBackground"                  Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="ScrollBarTrackBorderBrush"            Color="Transparent"/>
+  <SolidColorBrush x:Key="ScrollBarTrackBorderBrushPointerOver" Color="Transparent"/>
+
+  <!-- ListBox -->
+  <SolidColorBrush x:Key="ListBoxBackground"                         Color="{StaticResource Bg1Color}"/>
+  <SolidColorBrush x:Key="ListBoxItemBackgroundPointerOver"          Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="ListBoxItemBackgroundSelected"             Color="{StaticResource Bg3Color}"/>
+  <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedPointerOver"  Color="{StaticResource Bg4Color}"/>
+  <SolidColorBrush x:Key="ListBoxBorderBrush"                        Color="{StaticResource LineColor}"/>
+
+</ResourceDictionary>

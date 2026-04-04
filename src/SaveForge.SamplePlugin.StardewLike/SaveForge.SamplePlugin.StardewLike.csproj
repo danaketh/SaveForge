@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>SaveForge.SamplePlugin.StardewLike</RootNamespace>
+    <IsDevPlugin>true</IsDevPlugin>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SaveForge.SDK\SaveForge.SDK.csproj" />
+  </ItemGroup>
+</Project>

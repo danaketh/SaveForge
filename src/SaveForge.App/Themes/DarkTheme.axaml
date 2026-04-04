@@ -1,0 +1,233 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Window -->
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource BrushBg1}"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushText}"/>
+  </Style>
+
+  <!-- ─── TextBlock ─── -->
+  <Style Selector="TextBlock">
+    <Setter Property="FontFamily"  Value="{DynamicResource MonoFont}"/>
+    <Setter Property="Foreground"  Value="{DynamicResource BrushText}"/>
+    <Setter Property="FontSize"    Value="13"/>
+  </Style>
+
+  <Style Selector="Label">
+    <Setter Property="FontFamily"  Value="{DynamicResource MonoFont}"/>
+    <Setter Property="Foreground"  Value="{DynamicResource BrushTextDim}"/>
+    <Setter Property="FontSize"    Value="11"/>
+  </Style>
+
+  <!-- ─── Button base ─── -->
+  <Style Selector="Button">
+    <Setter Property="CornerRadius"               Value="0"/>
+    <Setter Property="FontFamily"                 Value="{DynamicResource MonoFont}"/>
+    <Setter Property="FontSize"                   Value="12"/>
+    <Setter Property="BorderThickness"            Value="1"/>
+    <Setter Property="Padding"                    Value="12,6"/>
+    <Setter Property="Cursor"                     Value="Hand"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment"   Value="Center"/>
+  </Style>
+
+  <Style Selector="Button:disabled">
+    <Setter Property="Opacity" Value="0.4"/>
+    <Setter Property="Cursor"  Value="Arrow"/>
+  </Style>
+
+  <!-- .primary — amber fill -->
+  <Style Selector="Button.primary">
+    <Setter Property="Background"  Value="{DynamicResource BrushAmber}"/>
+    <Setter Property="Foreground"  Value="#1A1000"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BrushAmberDim}"/>
+    <Setter Property="FontWeight"  Value="Bold"/>
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#FFC954"/>
+  </Style>
+
+  <!-- .accent — alias for primary, keeps old views working -->
+  <Style Selector="Button.accent">
+    <Setter Property="Background"  Value="{DynamicResource BrushAmber}"/>
+    <Setter Property="Foreground"  Value="#1A1000"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BrushAmberDim}"/>
+    <Setter Property="FontWeight"  Value="Bold"/>
+  </Style>
+  <Style Selector="Button.accent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#FFC954"/>
+  </Style>
+
+  <!-- .danger — dark red -->
+  <Style Selector="Button.danger">
+    <Setter Property="Background"  Value="#3A1414"/>
+    <Setter Property="BorderBrush" Value="#6B1C1F"/>
+    <Setter Property="Foreground"  Value="#FF8B8E"/>
+  </Style>
+  <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#4A1A1A"/>
+  </Style>
+
+  <!-- .ghost — transparent background -->
+  <Style Selector="Button.ghost">
+    <Setter Property="Background"  Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Foreground"  Value="{DynamicResource BrushTextDim}"/>
+  </Style>
+  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource BrushBg3}"/>
+  </Style>
+
+  <!-- .sm — small variant -->
+  <Style Selector="Button.sm">
+    <Setter Property="Padding"  Value="8,3"/>
+    <Setter Property="FontSize" Value="11"/>
+  </Style>
+
+  <!-- .icon-btn — square icon-only button -->
+  <Style Selector="Button.icon-btn">
+    <Setter Property="Background"  Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Padding"     Value="0"/>
+    <Setter Property="Width"       Value="24"/>
+    <Setter Property="Height"      Value="24"/>
+    <Setter Property="Foreground"  Value="{DynamicResource BrushTextDim}"/>
+  </Style>
+  <Style Selector="Button.icon-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource BrushBg3}"/>
+  </Style>
+
+  <!-- Close button hover: red -->
+  <Style Selector="Button.close-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#C42B2F"/>
+  </Style>
+  <Style Selector="Button.close-btn:pointerover">
+    <Setter Property="Foreground" Value="White"/>
+  </Style>
+
+  <!-- ─── Nav items ─── -->
+  <Style Selector="Button.nav-item">
+    <Setter Property="Background"              Value="Transparent"/>
+    <Setter Property="BorderBrush"             Value="Transparent"/>
+    <Setter Property="BorderThickness"         Value="0"/>
+    <Setter Property="Padding"                 Value="12,8"/>
+    <Setter Property="CornerRadius"            Value="0"/>
+    <Setter Property="Foreground"              Value="{DynamicResource BrushTextDim}"/>
+    <Setter Property="HorizontalAlignment"     Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="FontFamily"              Value="{DynamicResource MonoFont}"/>
+    <Setter Property="FontSize"                Value="12"/>
+  </Style>
+  <Style Selector="Button.nav-item:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource BrushBg3}"/>
+  </Style>
+  <Style Selector="Button.nav-item.selected">
+    <Setter Property="Foreground" Value="{DynamicResource BrushAmber}"/>
+  </Style>
+  <Style Selector="Button.nav-item.selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource BrushBg2}"/>
+  </Style>
+
+  <!-- ─── TextBox ─── -->
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="0"/>
+    <Setter Property="FontFamily"   Value="{DynamicResource MonoFont}"/>
+    <Setter Property="FontSize"     Value="12"/>
+    <Setter Property="Padding"      Value="10,6"/>
+    <Setter Property="Background"   Value="{DynamicResource BrushBg1}"/>
+    <Setter Property="Foreground"   Value="{DynamicResource BrushText}"/>
+    <Setter Property="CaretBrush"   Value="{DynamicResource BrushAmber}"/>
+  </Style>
+
+  <!-- ─── ComboBox ─── -->
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="0"/>
+    <Setter Property="FontFamily"   Value="{DynamicResource MonoFont}"/>
+    <Setter Property="FontSize"     Value="12"/>
+    <Setter Property="Padding"      Value="10,6"/>
+  </Style>
+
+  <!-- ─── NumericUpDown ─── -->
+  <Style Selector="NumericUpDown">
+    <Setter Property="Background"  Value="{DynamicResource BrushBg1}"/>
+    <Setter Property="Foreground"  Value="{DynamicResource BrushText}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BrushLine2}"/>
+  </Style>
+
+  <!-- ─── TabControl / TabItem ─── -->
+  <Style Selector="TabControl">
+    <Setter Property="Background" Value="{DynamicResource BrushBg1}"/>
+    <Setter Property="Padding"    Value="0"/>
+  </Style>
+
+  <Style Selector="TabItem">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}"/>
+    <Setter Property="FontSize"   Value="12"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextDim}"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Padding"    Value="16,8"/>
+  </Style>
+
+  <Style Selector="TabItem:selected">
+    <Setter Property="Foreground" Value="{DynamicResource BrushAmber}"/>
+  </Style>
+
+  <!-- ─── ScrollViewer ─── -->
+  <Style Selector="ScrollViewer">
+    <Setter Property="Background" Value="Transparent"/>
+  </Style>
+
+  <!-- ═══════════════════════════════════════════════
+       TEXTBLOCK UTILITY CLASSES
+  ═══════════════════════════════════════════════ -->
+
+  <Style Selector="TextBlock.heading">
+    <Setter Property="FontFamily" Value="{DynamicResource PixelFont}"/>
+    <Setter Property="FontSize"   Value="18"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushText}"/>
+  </Style>
+
+  <Style Selector="TextBlock.subheading">
+    <Setter Property="FontFamily" Value="{DynamicResource PixelFont}"/>
+    <Setter Property="FontSize"   Value="14"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushText}"/>
+  </Style>
+
+  <Style Selector="TextBlock.label">
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextDim}"/>
+    <Setter Property="FontSize"   Value="11"/>
+  </Style>
+
+  <Style Selector="TextBlock.faint">
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextFaint}"/>
+    <Setter Property="FontSize"   Value="10"/>
+  </Style>
+
+  <Style Selector="TextBlock.dim">
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextDim}"/>
+  </Style>
+
+  <Style Selector="TextBlock.amber">
+    <Setter Property="Foreground" Value="{DynamicResource BrushAmber}"/>
+  </Style>
+
+  <Style Selector="TextBlock.green">
+    <Setter Property="Foreground" Value="{DynamicResource BrushGreen}"/>
+  </Style>
+
+  <Style Selector="TextBlock.red">
+    <Setter Property="Foreground" Value="{DynamicResource BrushRed}"/>
+  </Style>
+
+  <Style Selector="TextBlock.blue">
+    <Setter Property="Foreground" Value="{DynamicResource BrushBlue}"/>
+  </Style>
+
+  <Style Selector="TextBlock.mono-sm">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}"/>
+    <Setter Property="FontSize"   Value="10"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextFaint}"/>
+  </Style>
+
+</Styles>

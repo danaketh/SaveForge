@@ -1,0 +1,10 @@
+{
+  "id": "stardew-like",
+  "name": "StardewLike Save Editor",
+  "description": "Edit saves for the StardewLike sample game.",
+  "author": "SaveForge Team",
+  "version": "1.0.0",
+  "minHostVersion": "1.0.0",
+  "maxHostVersion": null,
+  "pluginAssembly": "SaveForge.SamplePlugin.StardewLike.dll"
+}

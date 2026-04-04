@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:SaveForge.App.ViewModels"
+             x:Class="SaveForge.App.Views.AboutView"
+             x:DataType="vm:AboutViewModel">
+  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
+
+    <!-- Pixel logo block -->
+    <Border Width="48" Height="48"
+            Background="{DynamicResource BrushAmber}"
+            HorizontalAlignment="Center">
+      <TextBlock Text="SF"
+                 FontFamily="{DynamicResource PixelFont}"
+                 FontSize="22"
+                 Foreground="#1A1000"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"/>
+    </Border>
+
+    <TextBlock Text="SaveForge"
+               Classes="heading"
+               FontSize="28"
+               HorizontalAlignment="Center"/>
+    <TextBlock Text="{Binding AppVersion, StringFormat='v{0}'}"
+               Classes="amber"
+               FontSize="14"
+               HorizontalAlignment="Center"/>
+    <TextBlock Text="{Binding HostVersion, StringFormat='Host API {0}'}"
+               Classes="faint"
+               HorizontalAlignment="Center"/>
+
+  </StackPanel>
+</UserControl>

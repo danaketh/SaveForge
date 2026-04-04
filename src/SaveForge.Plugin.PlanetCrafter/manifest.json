@@ -1,0 +1,10 @@
+{
+  "id": "planet-crafter",
+  "name": "Planet Crafter Save Editor",
+  "description": "Edit saves for Planet Crafter.",
+  "author": "SaveForge Team",
+  "version": "1.0.0",
+  "minHostVersion": "1.0.0",
+  "maxHostVersion": null,
+  "pluginAssembly": "SaveForge.Plugin.PlanetCrafter.dll"
+}
