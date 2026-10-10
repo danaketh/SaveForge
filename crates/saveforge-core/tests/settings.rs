@@ -79,6 +79,40 @@ fn partial_file_merges_over_defaults_and_ignores_unknown_keys() {
 }
 
 #[test]
+fn wrong_type_for_one_key_keeps_other_keys() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    fs::write(
+        &path,
+        r#"{ "checkUpdatesOnStartup": "yes",
+             "pluginSaveDirectories": { "planet-crafter": "%APPDATA%/X" } }"#,
+    )
+    .unwrap();
+    let loaded = AppSettings::load(&path, defaults(dir.path()));
+    assert_eq!(
+        loaded.settings.plugin_save_directories["planet-crafter"],
+        "%APPDATA%/X"
+    );
+    assert!(loaded.settings.check_updates_on_startup);
+    assert!(loaded.warning.unwrap().contains("checkUpdatesOnStartup"));
+}
+
+#[test]
+fn unusable_file_is_preserved_as_bad_copy() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    for content in ["{ not json", "[]", r#"{ "catalogUrl": 5 }"#] {
+        fs::write(&path, content).unwrap();
+        let loaded = AppSettings::load(&path, defaults(dir.path()));
+        assert!(loaded.warning.is_some(), "{content}");
+        assert_eq!(
+            fs::read_to_string(dir.path().join("settings.json.bad")).unwrap(),
+            content
+        );
+    }
+}
+
+#[test]
 fn save_then_load_round_trips_with_camel_case_keys() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("settings.json");

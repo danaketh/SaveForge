@@ -4,7 +4,9 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 use crate::backup::write_atomic;
 use crate::paths::AppPaths;
@@ -31,33 +33,6 @@ pub struct LoadedSettings {
     pub warning: Option<String>,
 }
 
-/// On-disk shape: every key optional so older/partial files merge over defaults.
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-struct StoredSettings {
-    catalog_url: Option<String>,
-    plugin_directory: Option<PathBuf>,
-    backup_directory: Option<PathBuf>,
-    check_updates_on_startup: Option<bool>,
-    plugin_save_directories: Option<BTreeMap<String, String>>,
-}
-
-impl StoredSettings {
-    fn apply_to(self, d: AppSettings) -> AppSettings {
-        AppSettings {
-            catalog_url: self.catalog_url.unwrap_or(d.catalog_url),
-            plugin_directory: self.plugin_directory.unwrap_or(d.plugin_directory),
-            backup_directory: self.backup_directory.unwrap_or(d.backup_directory),
-            check_updates_on_startup: self
-                .check_updates_on_startup
-                .unwrap_or(d.check_updates_on_startup),
-            plugin_save_directories: self
-                .plugin_save_directories
-                .unwrap_or(d.plugin_save_directories),
-        }
-    }
-}
-
 impl AppSettings {
     pub fn defaults(paths: &AppPaths) -> Self {
         Self {
@@ -69,8 +44,10 @@ impl AppSettings {
         }
     }
 
-    /// Never fails: missing file means defaults; unreadable or invalid file means
-    /// defaults plus a warning.
+    /// Never fails. A missing file means defaults. Each known key is read on its
+    /// own, so a key with a wrong type falls back to its default without losing
+    /// the others. Whenever the file is not fully usable it is copied to
+    /// `<name>.bad` (so a later save cannot destroy it) and a warning is returned.
     pub fn load(path: &Path, defaults: AppSettings) -> LoadedSettings {
         let text = match std::fs::read_to_string(path) {
             Ok(text) => text,
@@ -87,15 +64,45 @@ impl AppSettings {
                 };
             }
         };
-        match serde_json::from_str::<StoredSettings>(&text) {
-            Ok(stored) => LoadedSettings {
-                settings: stored.apply_to(defaults),
+        let map = match serde_json::from_str::<Value>(&text) {
+            Ok(Value::Object(map)) => map,
+            Ok(_) => {
+                return unusable(path, defaults, "Settings file is not a JSON object");
+            }
+            Err(e) => {
+                return unusable(path, defaults, &format!("Settings file is invalid ({e})"));
+            }
+        };
+
+        let d = defaults;
+        let mut bad = Vec::new();
+        let settings = Self {
+            catalog_url: field(&map, "catalogUrl", d.catalog_url, &mut bad),
+            plugin_directory: field(&map, "pluginDirectory", d.plugin_directory, &mut bad),
+            backup_directory: field(&map, "backupDirectory", d.backup_directory, &mut bad),
+            check_updates_on_startup: field(
+                &map,
+                "checkUpdatesOnStartup",
+                d.check_updates_on_startup,
+                &mut bad,
+            ),
+            plugin_save_directories: field(
+                &map,
+                "pluginSaveDirectories",
+                d.plugin_save_directories,
+                &mut bad,
+            ),
+        };
+        if bad.is_empty() {
+            return LoadedSettings {
+                settings,
                 warning: None,
-            },
-            Err(e) => LoadedSettings {
-                settings: defaults,
-                warning: Some(format!("Settings file is invalid ({e}); using defaults.")),
-            },
+            };
+        }
+        let reason = format!("Invalid settings ignored: {}", bad.join(", "));
+        LoadedSettings {
+            warning: Some(warning_with_copy(path, &reason)),
+            settings,
         }
     }
 
@@ -108,6 +115,48 @@ impl AppSettings {
             source,
         })?;
         write_atomic(path, &json)
+    }
+}
+
+/// Value of `key`, or `default` when missing; wrong types also yield `default`
+/// and are recorded in `bad`.
+fn field<T: DeserializeOwned>(
+    map: &Map<String, Value>,
+    key: &'static str,
+    default: T,
+    bad: &mut Vec<&'static str>,
+) -> T {
+    match map.get(key) {
+        None => default,
+        Some(value) => T::deserialize(value).unwrap_or_else(|_| {
+            bad.push(key);
+            default
+        }),
+    }
+}
+
+fn unusable(path: &Path, defaults: AppSettings, reason: &str) -> LoadedSettings {
+    LoadedSettings {
+        settings: defaults,
+        warning: Some(warning_with_copy(path, reason)),
+    }
+}
+
+/// Copies the unusable file to `<name>.bad` and builds the user-facing warning.
+fn warning_with_copy(path: &Path, reason: &str) -> String {
+    let file_name = path
+        .file_name()
+        .map_or_else(|| "settings.json".into(), |n| n.to_string_lossy());
+    let bad_copy = path.with_file_name(format!("{file_name}.bad"));
+    match std::fs::copy(path, &bad_copy) {
+        Ok(_) => format!(
+            "{reason}; using defaults. Original kept at {}.",
+            bad_copy.display()
+        ),
+        Err(e) => {
+            tracing::warn!(path = %bad_copy.display(), %e, "could not keep copy of bad settings");
+            format!("{reason}; using defaults.")
+        }
     }
 }
 
