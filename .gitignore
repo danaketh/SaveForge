@@ -3,3 +3,4 @@
 *.cwasm
 .idea/
 .vscode/
+/.superpowers/
