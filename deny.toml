@@ -6,8 +6,10 @@ yanked = "deny"
 
 [licenses]
 confidence-threshold = 0.9
+private = { ignore = true }
 allow = [
     "MIT",
+    "MPL-2.0",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
