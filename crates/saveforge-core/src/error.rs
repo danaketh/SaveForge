@@ -22,7 +22,6 @@ pub enum CoreError {
 }
 
 impl CoreError {
-    #[allow(dead_code)] // used from Task 2 on
     pub(crate) fn io(path: &Path, source: std::io::Error) -> Self {
         Self::Io {
             path: path.to_path_buf(),
