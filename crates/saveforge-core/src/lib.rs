@@ -5,7 +5,9 @@ pub mod backup;
 pub mod discovery;
 mod error;
 pub mod manifest;
+pub mod paths;
 pub mod platform;
+pub mod settings;
 pub mod steam;
 pub mod tokens;
 
