@@ -2,8 +2,8 @@
 //!
 //! Supported: `%APPDATA%`, `%LOCALAPPDATA%`, `%USERPROFILE%`, `%TEMP%` (case-insensitive),
 //! a leading `~`, `{steam_app:ID}` and `{steam_compat:ID}` (Linux only). Unknown tokens
-//! are left verbatim; a known token that cannot be resolved makes the whole path
-//! unresolved.
+//! are left verbatim. A known token that cannot be resolved, or a result that is
+//! not an absolute path, makes the whole path unresolved.
 
 use std::path::PathBuf;
 
@@ -102,7 +102,14 @@ pub fn expand(raw: &str, env: &TokenEnv) -> Expanded {
         }
     }
     out.push_str(rest);
-    Expanded::Resolved(PathBuf::from(out))
+    let path = PathBuf::from(out);
+    // A relative result would resolve against the process working directory,
+    // which is arbitrary for a GUI app. On Windows this also rejects `C:foo`
+    // and `\foo`.
+    if !path.is_absolute() {
+        return Expanded::Unresolved(format!("'{}' is not an absolute path", path.display()));
+    }
+    Expanded::Resolved(path)
 }
 
 fn resolve_percent(name: &str, env: &TokenEnv) -> Token {

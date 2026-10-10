@@ -8,16 +8,26 @@ use saveforge_core::tokens::{Expanded, TokenEnv, expand};
 fn env(os: Os, steam: Option<SteamLibraries>) -> TokenEnv {
     TokenEnv {
         os,
-        appdata: Some(PathBuf::from("/A")),
-        local_appdata: Some(PathBuf::from("/L")),
-        home: Some(PathBuf::from("/H")),
-        temp: PathBuf::from("/T"),
+        appdata: Some(PathBuf::from(abs("/A"))),
+        local_appdata: Some(PathBuf::from(abs("/L"))),
+        home: Some(PathBuf::from(abs("/H"))),
+        temp: PathBuf::from(abs("/T")),
         steam,
     }
 }
 
+/// Absolute on the host OS: `/A` stays `/A` on Unix, becomes `C:/A` on Windows.
+fn abs(s: &str) -> String {
+    if cfg!(windows) {
+        format!("C:{s}")
+    } else {
+        s.to_owned()
+    }
+}
+
+/// Expected resolved path; `s` starts with '/' and is made absolute via [`abs`].
 fn resolved(s: &str) -> Expanded {
-    Expanded::Resolved(PathBuf::from(s))
+    Expanded::Resolved(PathBuf::from(abs(s)))
 }
 
 fn is_unresolved(e: &Expanded) -> bool {
@@ -63,22 +73,43 @@ fn leading_tilde_expands_to_home_only_as_whole_segment() {
     assert_eq!(expand("~", &e), resolved("/H"));
     assert_eq!(expand("~/saves", &e), resolved("/H/saves"));
     assert_eq!(expand("~\\saves", &e), resolved("/H\\saves"));
-    assert_eq!(expand("~user/saves", &e), resolved("~user/saves"));
-    assert_eq!(expand("a/~/b", &e), resolved("a/~/b"));
 }
 
 #[test]
-fn unknown_tokens_are_left_verbatim_and_later_tokens_still_expand() {
+fn unknown_tokens_are_left_verbatim() {
     let e = env(Os::Windows, None);
-    // "%FOO%/" kept verbatim, then appdata "/A", then "/x".
-    assert_eq!(expand("%FOO%/%APPDATA%/x", &e), resolved("%FOO%//A/x"));
-    assert_eq!(expand("{foo}/x", &e), resolved("{foo}/x"));
+    assert_eq!(expand("%APPDATA%/%FOO%/x", &e), resolved("/A/%FOO%/x"));
+    assert_eq!(expand("%APPDATA%/{foo}/x", &e), resolved("/A/{foo}/x"));
     assert_eq!(
-        expand("{steam_app:abc}/x", &e),
-        resolved("{steam_app:abc}/x")
+        expand("%APPDATA%/{steam_app:abc}", &e),
+        resolved("/A/{steam_app:abc}")
     );
-    assert_eq!(expand("100% sure", &e), resolved("100% sure"));
-    assert_eq!(expand("%APPDATA", &e), resolved("%APPDATA"));
+    assert_eq!(expand("%APPDATA%/100% sure", &e), resolved("/A/100% sure"));
+    assert_eq!(expand("%APPDATA%/%APPDATA", &e), resolved("/A/%APPDATA"));
+}
+
+#[test]
+fn relative_results_are_unresolved() {
+    let e = env(Os::Windows, None);
+    for raw in [
+        "saves/x",
+        "%FOO%/x",
+        "{foo}/x",
+        "~user/saves",
+        "a/~/b",
+        "100% sure",
+    ] {
+        assert!(is_unresolved(&expand(raw, &e)), "{raw}");
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_drive_relative_and_rooted_paths_are_unresolved() {
+    let e = env(Os::Windows, None);
+    for raw in ["C:foo", r"\foo", "/foo"] {
+        assert!(is_unresolved(&expand(raw, &e)), "{raw}");
+    }
 }
 
 #[test]
