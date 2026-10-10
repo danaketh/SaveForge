@@ -4,5 +4,6 @@
 mod error;
 pub mod manifest;
 pub mod platform;
+pub mod steam;
 
 pub use error::{CoreError, Result};
