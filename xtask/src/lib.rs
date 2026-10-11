@@ -1,5 +1,6 @@
 //! Helpers behind `cargo xtask` (spec §10).
 
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -7,6 +8,24 @@ use anyhow::{Context, ensure};
 use saveforge_core::manifest::PluginManifest;
 
 pub const WASM_TARGET: &str = "wasm32-wasip2";
+
+/// Workspace root: parent of the xtask crate. Prefers the `CARGO_MANIFEST_DIR`
+/// cargo sets at run time over the compile-time one, so a binary reused from
+/// another checkout (shared target dir) still builds *this* checkout.
+pub fn workspace_root(runtime_manifest_dir: Option<OsString>, compile_time: &str) -> PathBuf {
+    let manifest_dir =
+        runtime_manifest_dir.map_or_else(|| PathBuf::from(compile_time), PathBuf::from);
+    manifest_dir
+        .parent()
+        .map_or_else(|| manifest_dir.clone(), Path::to_path_buf)
+}
+
+/// Cargo's target dir as the child `cargo build` (run in `root`) will see it:
+/// `CARGO_TARGET_DIR` if set (relative values are relative to `root`),
+/// otherwise `root/target`.
+pub fn target_dir(root: &Path, cargo_target_dir: Option<OsString>) -> PathBuf {
+    cargo_target_dir.map_or_else(|| root.join("target"), |dir| root.join(dir))
+}
 
 /// Where a plugin crate lives: `plugins/` ships to users, `fixtures/` feeds tests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -114,3 +114,37 @@ fn install_fails_when_build_output_missing() {
     let err = install(&root.path().join("target"), &krate).unwrap_err();
     assert!(err.to_string().contains("build output missing"), "{err}");
 }
+
+#[test]
+fn workspace_root_prefers_runtime_manifest_dir() {
+    use std::ffi::OsString;
+    use std::path::PathBuf;
+    assert_eq!(
+        xtask::workspace_root(
+            Some(OsString::from("/checkout-b/xtask")),
+            "/checkout-a/xtask"
+        ),
+        PathBuf::from("/checkout-b")
+    );
+    assert_eq!(
+        xtask::workspace_root(None, "/checkout-a/xtask"),
+        PathBuf::from("/checkout-a")
+    );
+}
+
+#[test]
+fn relative_target_dir_resolves_against_workspace_root() {
+    use std::ffi::OsString;
+    use std::path::PathBuf;
+    let root = Path::new("/ws");
+    assert_eq!(xtask::target_dir(root, None), PathBuf::from("/ws/target"));
+    assert_eq!(
+        xtask::target_dir(root, Some(OsString::from("out"))),
+        PathBuf::from("/ws/out")
+    );
+    let absolute = std::env::temp_dir().join("tgt");
+    assert_eq!(
+        xtask::target_dir(root, Some(absolute.clone().into_os_string())),
+        absolute
+    );
+}

@@ -1,9 +1,8 @@
-use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use saveforge_core::manifest::PluginManifest;
-use xtask::{WASM_TARGET, find_plugin_crates, install};
+use xtask::{WASM_TARGET, find_plugin_crates, install, target_dir, workspace_root};
 
 const USAGE: &str = "usage: cargo xtask plugins [-p <package-or-plugin-id>]";
 
@@ -15,22 +14,17 @@ fn main() -> Result<()> {
     }
 }
 
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("xtask lives inside the workspace")
-        .to_path_buf()
-}
-
 fn plugins(args: &[String]) -> Result<()> {
     let filter = match args {
         [] => None,
         [flag, name] if flag == "-p" => Some(name.as_str()),
         _ => bail!(USAGE),
     };
-    let root = workspace_root();
-    let target_dir =
-        std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), PathBuf::from);
+    let root = workspace_root(
+        std::env::var_os("CARGO_MANIFEST_DIR"),
+        env!("CARGO_MANIFEST_DIR"),
+    );
+    let target_dir = target_dir(&root, std::env::var_os("CARGO_TARGET_DIR"));
 
     let crates: Vec<_> = find_plugin_crates(&root)
         .into_iter()
