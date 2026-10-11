@@ -1,0 +1,12 @@
+{
+  "id": "test-plugin",
+  "name": "Test Plugin",
+  "version": "0.1.0",
+  "author": "SaveForge",
+  "description": "Fixture used by saveforge-host tests.",
+  "apiVersion": "0.1",
+  "minHostVersion": "0.1.0",
+  "maxHostVersion": null,
+  "component": "plugin.wasm",
+  "fileExtensions": [".fixture"]
+}

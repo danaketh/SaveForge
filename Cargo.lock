@@ -1100,6 +1100,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-plugin"
+version = "0.1.0"
+dependencies = [
+ "saveforge-sdk",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1756,6 +1763,15 @@ dependencies = [
  "serde_json",
  "unicode-ident",
  "wasmparser 0.259.0",
+]
+
+[[package]]
+name = "xtask"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "saveforge-core",
+ "tempfile",
 ]
 
 [[package]]

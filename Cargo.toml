@@ -1,6 +1,12 @@
 [workspace]
 resolver = "3"
-members = ["crates/saveforge-core", "crates/saveforge-plugin-api", "sdk/saveforge-sdk"]
+members = [
+    "crates/saveforge-core",
+    "crates/saveforge-plugin-api",
+    "fixtures/test-plugin",
+    "sdk/saveforge-sdk",
+    "xtask",
+]
 
 [workspace.package]
 version = "0.1.0"
