@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/saveforge-core",
+    "crates/saveforge-host",
     "crates/saveforge-plugin-api",
     "fixtures/test-plugin",
     "sdk/saveforge-sdk",

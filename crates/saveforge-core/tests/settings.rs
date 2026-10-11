@@ -18,6 +18,7 @@ fn app_paths_layout() {
     );
     assert_eq!(p.logs_dir(), PathBuf::from("/data/logs"));
     assert_eq!(p.crash_log(), PathBuf::from("/data/crash.log"));
+    assert_eq!(p.wasm_cache_dir(), PathBuf::from("/data/cache/wasmtime"));
     assert!(AppPaths::detect().is_some());
 }
 

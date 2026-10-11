@@ -36,4 +36,9 @@ impl AppPaths {
     pub fn crash_log(&self) -> PathBuf {
         self.data_dir.join("crash.log")
     }
+
+    /// Wasmtime's compiled-component cache (keyed by wasmtime version and module hash).
+    pub fn wasm_cache_dir(&self) -> PathBuf {
+        self.data_dir.join("cache").join("wasmtime")
+    }
 }
