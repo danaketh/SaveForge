@@ -1,7 +1,7 @@
 use saveforge_plugin_api::ui::{
     Button, ButtonStyle, Node, Tabs, TextSpan, TextStyle, UiTree, Widget,
 };
-use saveforge_plugin_api::{API_VERSION, MAX_TREE_NODES, validate_tree};
+use saveforge_plugin_api::{API_VERSION, MAX_TREE_DEPTH, MAX_TREE_NODES, validate_tree};
 
 fn node(widget: Widget, children: &[u32]) -> Node {
     Node {
@@ -139,6 +139,20 @@ fn node_cap_is_inclusive() {
         .children
         .push(u32::try_from(MAX_TREE_NODES).unwrap());
     assert!(err(&tree(nodes)).contains("max"));
+}
+
+#[test]
+fn depth_cap_is_inclusive() {
+    // A chain of columns: node i's only child is i + 1; the last is a leaf.
+    let chain = |depth: usize| {
+        let mut nodes: Vec<Node> = (0..depth - 1)
+            .map(|i| node(Widget::Column, &[u32::try_from(i + 1).unwrap()]))
+            .collect();
+        nodes.push(node(Widget::Divider, &[]));
+        tree(nodes)
+    };
+    assert_eq!(validate_tree(&chain(MAX_TREE_DEPTH)), Ok(()));
+    assert!(err(&chain(MAX_TREE_DEPTH + 1)).contains("deep"));
 }
 
 #[test]

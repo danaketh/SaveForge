@@ -18,7 +18,7 @@ pub use bindings::exports::saveforge::plugin::editor::AuxFile;
 pub use bindings::saveforge::plugin::host::{Host as LogHost, Level};
 pub use bindings::saveforge::plugin::ui::{self, Host as UiHost};
 pub use bindings::{Plugin as PluginWorld, PluginPre as PluginWorldPre};
-pub use tree::{MAX_TREE_NODES, validate_tree};
+pub use tree::{MAX_TREE_DEPTH, MAX_TREE_NODES, validate_tree};
 
 /// Version of the WIT package this host implements (`saveforge:plugin@0.1.0`).
 pub const API_VERSION: Version = Version::new(0, 1, 0);

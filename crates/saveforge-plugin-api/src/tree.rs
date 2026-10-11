@@ -6,6 +6,10 @@ use crate::ui::{UiTree, Widget};
 
 pub const MAX_TREE_NODES: usize = 20_000;
 
+/// Deepest allowed root-to-leaf path, counting the root as 1. The host
+/// renderer builds widgets recursively, so this bounds its stack use.
+pub const MAX_TREE_DEPTH: usize = 64;
+
 /// Checks that `tree` is a well-formed tree the renderer can trust. Returns a
 /// human-readable reason on failure.
 ///
@@ -13,7 +17,8 @@ pub const MAX_TREE_NODES: usize = 20_000;
 /// in range and not the root. Every non-root node has exactly one parent and is
 /// reachable from the root, which rules out cycles. Child counts fit the widget
 /// (containers: any, `scrollable`/`tabs`: exactly one, leaves: none). Widget ids
-/// are unique. `tabs` has at least one title and `selected` is in range.
+/// are unique. `tabs` has at least one title and `selected` is in range. No
+/// path from the root is longer than [`MAX_TREE_DEPTH`] nodes.
 pub fn validate_tree(tree: &UiTree) -> Result<(), String> {
     let nodes = &tree.nodes;
     if nodes.is_empty() {
@@ -60,12 +65,22 @@ pub fn validate_tree(tree: &UiTree) -> Result<(), String> {
     }
 
     let mut seen = vec![false; nodes.len()];
-    let mut stack = vec![0usize];
-    while let Some(index) = stack.pop() {
+    let mut stack = vec![(0usize, 1usize)];
+    while let Some((index, depth)) = stack.pop() {
         if std::mem::replace(&mut seen[index], true) {
             continue;
         }
-        stack.extend(nodes[index].children.iter().map(|&c| c as usize));
+        if depth > MAX_TREE_DEPTH {
+            return Err(format!(
+                "tree is too deep: node {index} is at depth {depth} (max {MAX_TREE_DEPTH})"
+            ));
+        }
+        stack.extend(
+            nodes[index]
+                .children
+                .iter()
+                .map(|&c| (c as usize, depth + 1)),
+        );
     }
     if let Some(orphan) = seen.iter().position(|reached| !reached) {
         return Err(format!("node {orphan} is not reachable from the root"));
