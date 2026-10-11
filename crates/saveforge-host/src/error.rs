@@ -38,7 +38,6 @@ pub enum HostError {
 
 /// Maps a failed guest call to a fault: epoch interrupts are timeouts,
 /// everything else is a trap.
-#[allow(dead_code)] // used from Task 6
 pub(crate) fn classify(error: &wasmtime::Error) -> PluginFault {
     match error.downcast_ref::<Trap>() {
         Some(Trap::Interrupt) => PluginFault::Timeout,

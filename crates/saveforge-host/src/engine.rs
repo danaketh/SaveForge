@@ -189,7 +189,6 @@ impl PluginEngine {
     }
 
     /// Fresh store + instance for `plugin`, within the io-call deadline.
-    #[allow(dead_code)] // used from Task 6
     pub(crate) fn instantiate(
         &self,
         plugin: &LoadedPlugin,
@@ -203,7 +202,6 @@ impl PluginEngine {
         Ok((store, world))
     }
 
-    #[allow(dead_code)] // used from Task 6
     pub(crate) fn ui_ticks(&self) -> u64 {
         ticks(self.limits.ui_call)
     }
