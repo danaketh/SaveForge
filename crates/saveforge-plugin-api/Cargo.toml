@@ -1,0 +1,13 @@
+[package]
+name = "saveforge-plugin-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+semver.workspace = true
+wasmtime.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,102 @@
+package saveforge:plugin@0.1.0;
+
+interface ui {
+  /// WIT has no recursive types: the tree is a flat arena. nodes[0] is the root.
+  type node-id = u32;
+
+  record ui-tree { nodes: list<node> }
+  record node { widget: widget, children: list<node-id> }
+
+  enum text-style { body, muted, heading, error }
+  record text-span { text: string, style: text-style }
+
+  /// Plugin owns the selected tab; the node's single child is the active page.
+  record tabs { id: string, titles: list<string>, selected: u32 }
+
+  record text-input { value: string, placeholder: option<string>, max-len: option<u32> }
+  record number-input { value: f64, min: option<f64>, max: option<f64>, decimals: u8, step: option<f64> }
+  record pick-option { value: string, display: string }
+  record pick-list { options: list<pick-option>, selected: option<string>, placeholder: option<string> }
+
+  variant input {
+    text(text-input),
+    number(number-input),
+    checkbox(bool),
+    pick(pick-list),
+  }
+
+  record field {
+    id: string,
+    label: string,
+    help: option<string>,
+    error: option<string>,
+    read-only: bool,
+    input: input,
+  }
+
+  enum button-style { primary, secondary, danger }
+  record button { id: string, label: string, style: button-style, enabled: bool }
+
+  record list-spec {
+    id: string,
+    /// Shows a remove button on each row (children are rows).
+    removable: bool,
+    /// When set, renders a pick-list + "Add" button under the rows.
+    add-options: option<pick-list>,
+  }
+
+  variant widget {
+    column,
+    row,
+    scrollable,
+    divider,
+    section(string),
+    tabs(tabs),
+    text(text-span),
+    field(field),
+    button(button),
+    %list(list-spec),
+  }
+
+  variant event {
+    text-changed(tuple<string, string>),
+    number-changed(tuple<string, f64>),
+    toggled(tuple<string, bool>),
+    picked(tuple<string, string>),
+    pressed(string),
+    tab-selected(tuple<string, u32>),
+    list-add(tuple<string, string>),
+    list-remove(tuple<string, u32>),
+  }
+}
+
+interface editor {
+  use ui.{ui-tree, event};
+
+  record aux-file { id: string, bytes: list<u8> }
+
+  resource document {
+    view: func() -> ui-tree;
+    update: func(ev: event);
+    is-dirty: func() -> bool;
+    /// Pure: must not change dirty state. Err blocks the save and is shown to the user.
+    serialize: func() -> result<list<u8>, string>;
+    /// Called by the host only after the bytes were durably written; clears dirty state.
+    mark-saved: func();
+  }
+
+  /// Some(priority) if the plugin can open the file; higher wins.
+  detect: func(file-name: string, header: list<u8>) -> option<u32>;
+
+  open: func(file-name: string, bytes: list<u8>, aux: list<aux-file>) -> result<document, string>;
+}
+
+interface host {
+  enum level { trace, debug, info, warn, error }
+  log: func(level: level, msg: string);
+}
+
+world plugin {
+  import host;
+  export editor;
+}

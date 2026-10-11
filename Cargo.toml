@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/saveforge-core"]
+members = ["crates/saveforge-core", "crates/saveforge-plugin-api"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,16 +9,30 @@ rust-version = "1.90"
 publish = false
 
 [workspace.dependencies]
+anyhow = "1.0.104"
 directories = "6.0.0"
 filetime = "0.2.29"
+saveforge-core = { path = "crates/saveforge-core" }
+saveforge-plugin-api = { path = "crates/saveforge-plugin-api" }
 semver = { version = "1.0.28", features = ["serde"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 tempfile = "3.27.0"
 thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["formatting", "macros"] }
+tokio = { version = "1.53.2", default-features = false }
 tracing = "0.1.44"
+wasmtime = { version = "49.0.2", default-features = false, features = [
+    "runtime",
+    "cranelift",
+    "component-model",
+    "std",
+    "parallel-compilation",
+    "cache",
+] }
+wasmtime-wasi = "49.0.2"
 winreg = "0.56.0"
+wit-bindgen = "0.62.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
