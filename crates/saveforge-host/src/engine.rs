@@ -2,7 +2,6 @@
 
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock};
 use std::thread;
 use std::time::Duration;
@@ -10,8 +9,9 @@ use std::time::Duration;
 use saveforge_core::manifest::PluginManifest;
 use saveforge_plugin_api::{API_VERSION, Level, LogHost, PluginWorld, PluginWorldPre, UiHost};
 use semver::Version;
-use wasmtime::component::{Component, HasSelf, Linker, ResourceTable};
+use wasmtime::component::{Component, HasSelf, Linker, Resource, ResourceTable};
 use wasmtime::{Cache, CacheConfig, Config, Engine, Store, StoreLimits, StoreLimitsBuilder};
+use wasmtime_wasi::p2::DynPollable;
 use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
 
 use crate::error::HostError;
@@ -94,13 +94,13 @@ impl fmt::Debug for LoadedPlugin {
     }
 }
 
-/// One wasmtime engine for the app, with an epoch ticker thread that stops
-/// when the engine is dropped.
+/// One wasmtime engine for the app, with an epoch ticker thread that runs for
+/// as long as anything (this engine, a `LoadedPlugin`, a `DocumentSession`)
+/// still holds the underlying wasmtime engine.
 pub struct PluginEngine {
     engine: Engine,
     linker: Linker<State>,
     limits: HostLimits,
-    ticker_stop: Arc<AtomicBool>,
 }
 
 impl fmt::Debug for PluginEngine {
@@ -124,16 +124,15 @@ impl PluginEngine {
         let engine = Engine::new(&config).map_err(|e| engine_error(&e))?;
         let mut linker = Linker::new(&engine);
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(|e| engine_error(&e))?;
+        make_waiting_non_blocking(&mut linker).map_err(|e| engine_error(&e))?;
         PluginWorld::add_to_linker::<State, HasSelf<State>>(&mut linker, |state| state)
             .map_err(|e| engine_error(&e))?;
 
-        let ticker_stop = Arc::new(AtomicBool::new(false));
-        spawn_ticker(engine.clone(), Arc::clone(&ticker_stop));
+        spawn_ticker(&engine);
         Ok(Self {
             engine,
             linker,
             limits,
-            ticker_stop,
         })
     }
 
@@ -211,19 +210,40 @@ impl PluginEngine {
     }
 }
 
-impl Drop for PluginEngine {
-    fn drop(&mut self) {
-        self.ticker_stop.store(true, Ordering::Relaxed);
-    }
+/// Epoch interruption only fires while wasm code runs, not while a guest waits
+/// inside a WASI host call (e.g. `std::thread::sleep` becomes a monotonic-clock
+/// pollable plus `poll`/`block`). With nothing for a plugin to wait on (no
+/// files, sockets or stdin), every wait is replaced by "ready now": sleeps
+/// return at once and busy-waiting guests stay subject to the deadline.
+fn make_waiting_non_blocking(linker: &mut Linker<State>) -> wasmtime::Result<()> {
+    linker.allow_shadowing(true);
+    let mut poll = linker.instance("wasi:io/poll@0.2.12")?;
+    poll.func_wrap(
+        "poll",
+        |_store, (pollables,): (Vec<Resource<DynPollable>>,)| {
+            let count = u32::try_from(pollables.len()).unwrap_or(u32::MAX);
+            Ok(((0..count).collect::<Vec<u32>>(),))
+        },
+    )?;
+    poll.func_wrap(
+        "[method]pollable.block",
+        |_store, (_pollable,): (Resource<DynPollable>,)| Ok(()),
+    )?;
+    linker.allow_shadowing(false);
+    Ok(())
 }
 
-fn spawn_ticker(engine: Engine, stop: Arc<AtomicBool>) {
+fn spawn_ticker(engine: &Engine) {
+    // A weak handle: stores and pre-instantiated plugins keep the engine
+    // alive after `PluginEngine` is dropped, and their deadlines must still fire.
+    let engine = engine.weak();
     thread::Builder::new()
         .name("saveforge-epoch".to_owned())
         .spawn(move || {
-            while !stop.load(Ordering::Relaxed) {
-                thread::sleep(TICK);
+            while let Some(engine) = engine.upgrade() {
                 engine.increment_epoch();
+                drop(engine);
+                thread::sleep(TICK);
             }
         })
         .expect("spawn epoch ticker thread");

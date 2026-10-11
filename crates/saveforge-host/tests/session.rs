@@ -176,3 +176,33 @@ fn detect_priority_none_and_timeout() {
         "{err:?}"
     );
 }
+
+#[test]
+fn sleeping_guest_cannot_block_past_deadline() {
+    let (_root, engine, plugin) = setup();
+    let mut s = open(&engine, &plugin, b"x");
+    let started = Instant::now();
+    let _ = s.update(&Event::Pressed("sleep".to_owned()));
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "guest sleep blocked the host for {:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
+fn session_outliving_engine_still_times_out() {
+    let (_root, engine, plugin) = setup();
+    let mut s = open(&engine, &plugin, b"x");
+    drop(plugin);
+    drop(engine);
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let result = s.update(&Event::Pressed("spin".to_owned()));
+        let _ = tx.send(matches!(
+            result,
+            Err(HostError::Fault(PluginFault::Timeout))
+        ));
+    });
+    assert_eq!(rx.recv_timeout(Duration::from_secs(5)), Ok(true));
+}

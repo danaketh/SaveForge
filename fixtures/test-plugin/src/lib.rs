@@ -77,6 +77,10 @@ impl Document for FixtureDoc {
                 self.dirty = true;
             }
             Event::Pressed(id) if id == "spin" => spin(),
+            // Blocks inside a WASI host call, where epoch interruption cannot reach.
+            Event::Pressed(id) if id == "sleep" => {
+                std::thread::sleep(std::time::Duration::from_secs(5));
+            }
             Event::Pressed(id) if id == "panic" => panic!("fixture panic in update"),
             _ => {}
         }
