@@ -32,7 +32,7 @@ impl PluginEntry {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct PluginRegistry {
     entries: Vec<PluginEntry>,
     faults: HashMap<String, u8>,

@@ -5,9 +5,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use saveforge_app::Services;
+use saveforge_core::paths::AppPaths;
 use saveforge_core::platform::Os;
 use saveforge_core::tokens::TokenEnv;
 use saveforge_host::{HostLimits, PluginEngine, PluginRegistry};
+use time::UtcOffset;
 
 fn workspace() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -52,12 +55,7 @@ pub fn engine() -> Arc<PluginEngine> {
     )
 }
 
-pub struct Services {
-    pub engine: Arc<PluginEngine>,
-    pub tokens: Arc<TokenEnv>,
-}
-
-/// A temp dir with the fixture installed as `test-plugin`.
+/// A temp app data dir with the fixture installed as `test-plugin`.
 pub struct World {
     pub dir: tempfile::TempDir,
     pub services: Services,
@@ -69,6 +67,7 @@ impl World {
         install_fixture(&dir.path().join("plugins"), "test-plugin");
         let services = Services {
             engine: engine(),
+            paths: AppPaths::under(dir.path().join("data")),
             tokens: Arc::new(TokenEnv {
                 os: Os::current(),
                 appdata: Some(dir.path().to_path_buf()),
@@ -77,6 +76,7 @@ impl World {
                 temp: std::env::temp_dir(),
                 steam: None,
             }),
+            local_offset: UtcOffset::UTC,
         };
         Self { dir, services }
     }

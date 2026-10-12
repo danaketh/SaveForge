@@ -86,3 +86,15 @@ fn third_fault_disables_plugin() {
     assert!(!registry.record_fault("fix"), "already disabled");
     assert!(!registry.record_fault("unknown"));
 }
+
+#[test]
+fn clones_share_loaded_plugins() {
+    let root = tempfile::tempdir().unwrap();
+    common::install_fixture(root.path(), "fix", "0.1.0", |_| {});
+    let registry = PluginRegistry::scan(&common::engine(), root.path());
+    let copy = registry.clone();
+    assert!(std::sync::Arc::ptr_eq(
+        registry.loaded().next().unwrap(),
+        copy.loaded().next().unwrap()
+    ));
+}

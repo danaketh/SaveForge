@@ -1,3 +1,5 @@
-//! Entry point; wired to `saveforge_app::run` once the app exists (Task 8).
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-fn main() {}
+fn main() -> iced::Result {
+    saveforge_app::run()
+}
