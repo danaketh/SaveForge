@@ -1,5 +1,6 @@
 //! The `SaveForge` desktop app (spec §5).
 
+pub mod documents;
 pub mod format;
 pub mod home;
 pub mod render;
