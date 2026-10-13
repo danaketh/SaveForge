@@ -75,6 +75,7 @@ pub enum Message {
     CancelPath,
     OpenSave(PathBuf),
     Detected {
+        request: u64,
         path: PathBuf,
         result: Result<Detected, Failure>,
     },
@@ -83,12 +84,16 @@ pub enum Message {
         plugin_id: String,
     },
     Opened {
+        request: u64,
         plugin_id: String,
         result: Result<OpenedDocument, Failure>,
     },
     Editor(UiMessage),
     Save,
-    Saved(Result<PathBuf, Failure>),
+    Saved {
+        request: u64,
+        result: Result<PathBuf, Failure>,
+    },
     CloseEditor,
     GuardSave,
     GuardDiscard,
@@ -107,7 +112,12 @@ pub struct App {
     modal: Option<Modal>,
     status: Option<String>,
     busy: Option<String>,
-    after_save: Option<Pending>,
+    /// Action to run once save request `.0` succeeds (from the unsaved guard).
+    after_save: Option<(u64, Pending)>,
+    /// Source of request numbers tying background results to their request.
+    next_request: u64,
+    /// The detect/open chain whose result is still wanted; others are stale.
+    pending_open: Option<u64>,
 }
 
 impl App {
@@ -130,6 +140,8 @@ impl App {
             status: warning,
             busy: Some("Loading plugins…".to_owned()),
             after_save: None,
+            next_request: 0,
+            pending_open: None,
         };
         let task = blocking(
             move || PluginRegistry::scan(&engine, &plugin_dir),
@@ -151,6 +163,8 @@ impl App {
             status: None,
             busy: None,
             after_save: None,
+            next_request: 0,
+            pending_open: None,
         }
     }
 
@@ -179,6 +193,11 @@ impl App {
 
     pub fn busy(&self) -> Option<&str> {
         self.busy.as_deref()
+    }
+
+    /// The request number of the open in progress, if any.
+    pub fn open_request(&self) -> Option<u64> {
+        self.pending_open
     }
 
     pub fn settings(&self) -> &AppSettings {
@@ -258,15 +277,32 @@ impl App {
                 Task::none()
             }
             Message::OpenSave(path) => self.guarded(Pending::OpenFile(path)),
-            Message::Detected { path, result } => self.detected(path, result),
+            Message::Detected {
+                request,
+                path,
+                result,
+            } => self.detected(request, path, result),
             Message::ChoosePlugin { path, plugin_id } => {
                 self.modal = None;
-                match self.loaded_plugin(&plugin_id) {
-                    Some(plugin) => self.start_open(plugin, path),
-                    None => Task::none(),
+                if let (Some(request), Some(plugin)) =
+                    (self.pending_open, self.loaded_plugin(&plugin_id))
+                {
+                    self.start_open(request, plugin, path)
+                } else {
+                    self.pending_open = None;
+                    Task::none()
                 }
             }
-            Message::Opened { plugin_id, result } => {
+            Message::Opened {
+                request,
+                plugin_id,
+                result,
+            } => {
+                if self.pending_open != Some(request) {
+                    // Superseded by a newer open, a plugin switch or a cancel.
+                    return Task::none();
+                }
+                self.pending_open = None;
                 self.busy = None;
                 match result {
                     Ok(opened) => {
@@ -292,12 +328,16 @@ impl App {
                 Task::none()
             }
             Message::Save => self.start_save(),
-            Message::Saved(result) => self.saved(result),
+            Message::Saved { request, result } => self.saved(request, result),
             Message::CloseEditor => self.guarded(Pending::CloseEditor),
             Message::GuardSave => {
                 if let Some(Modal::Unsaved { then }) = self.modal.take() {
-                    self.after_save = Some(then);
-                    return self.start_save();
+                    let task = self.start_save();
+                    // Keyed to the save in flight (new or already running).
+                    if let Some(request) = self.editor.as_ref().and_then(|e| e.save_request) {
+                        self.after_save = Some((request, then));
+                    }
+                    return task;
                 }
                 Task::none()
             }
@@ -309,8 +349,9 @@ impl App {
                 }
             },
             Message::CancelModal => {
-                self.modal = None;
-                self.after_save = None;
+                if matches!(self.modal.take(), Some(Modal::ChoosePlugin { .. })) {
+                    self.pending_open = None;
+                }
                 Task::none()
             }
             Message::CloseRequested(id) => self.guarded(Pending::Exit(id)),
@@ -334,20 +375,36 @@ impl App {
     fn perform(&mut self, action: Pending) -> Task<Message> {
         match action {
             Pending::OpenFile(path) => {
-                self.editor = None;
+                self.drop_editor();
                 self.start_detect(path)
             }
             Pending::SelectPlugin(id) => self.select_plugin(id),
             Pending::CloseEditor => {
-                self.editor = None;
+                self.drop_editor();
                 Task::none()
             }
             Pending::Exit(id) => window::close(id),
         }
     }
 
+    /// Closes the document. A save still in flight finishes on disk, but its
+    /// result no longer applies to anything shown.
+    fn drop_editor(&mut self) {
+        if self.editor.take().is_some_and(|e| e.saving) {
+            self.busy = None;
+        }
+    }
+
+    fn next_request(&mut self) -> u64 {
+        self.next_request += 1;
+        self.next_request
+    }
+
     fn select_plugin(&mut self, id: String) -> Task<Message> {
-        self.editor = None;
+        self.drop_editor();
+        if self.pending_open.take().is_some() {
+            self.busy = None;
+        }
         self.home.editing = None;
         self.home.raw_dir = self
             .loaded_plugin(&id)
@@ -404,24 +461,36 @@ impl App {
         let (Some(services), Plugins::Ready(registry)) = (&self.services, &self.plugins) else {
             return Task::none();
         };
-        self.busy = Some("Detecting…".to_owned());
         let engine = Arc::clone(&services.engine);
         let registry = registry.clone();
+        let request = self.next_request();
+        self.pending_open = Some(request);
+        self.busy = Some("Detecting…".to_owned());
         let target = path.clone();
         blocking(
             move || detect_file(&engine, &registry, &target),
             move |result| Message::Detected {
+                request,
                 path: path.clone(),
                 result,
             },
         )
     }
 
-    fn detected(&mut self, path: PathBuf, result: Result<Detected, Failure>) -> Task<Message> {
+    fn detected(
+        &mut self,
+        request: u64,
+        path: PathBuf,
+        result: Result<Detected, Failure>,
+    ) -> Task<Message> {
+        if self.pending_open != Some(request) {
+            return Task::none();
+        }
         self.busy = None;
         let detected = match result {
             Ok(detected) => detected,
             Err(failure) => {
+                self.pending_open = None;
                 self.status = Some(failure.message);
                 return Task::none();
             }
@@ -430,12 +499,13 @@ impl App {
             self.record_fault(id);
         }
         match detected.outcome {
-            DetectOutcome::Open(plugin) => self.start_open(plugin, path),
+            DetectOutcome::Open(plugin) => self.start_open(request, plugin, path),
             DetectOutcome::Choose(candidates) => {
                 self.modal = Some(Modal::ChoosePlugin { path, candidates });
                 Task::none()
             }
             DetectOutcome::NoMatch => {
+                self.pending_open = None;
                 let name = path
                     .file_name()
                     .map(|n| n.to_string_lossy().into_owned())
@@ -446,7 +516,12 @@ impl App {
         }
     }
 
-    fn start_open(&mut self, plugin: Arc<LoadedPlugin>, path: PathBuf) -> Task<Message> {
+    fn start_open(
+        &mut self,
+        request: u64,
+        plugin: Arc<LoadedPlugin>,
+        path: PathBuf,
+    ) -> Task<Message> {
         let Some(services) = &self.services else {
             return Task::none();
         };
@@ -457,6 +532,7 @@ impl App {
         blocking(
             move || open_document(&engine, &plugin, &path, &tokens),
             move |result| Message::Opened {
+                request,
                 plugin_id: plugin_id.clone(),
                 result,
             },
@@ -470,23 +546,35 @@ impl App {
         if editor.saving || editor.crashed.is_some() {
             return Task::none();
         }
+        self.next_request += 1;
+        let request = self.next_request;
         editor.saving = true;
+        editor.save_request = Some(request);
         self.busy = Some("Saving…".to_owned());
         let session = editor.session();
         let path = editor.path.clone();
         let backup_root = self.settings.backup_directory.clone();
         blocking(
             move || save_document(&session, &path, &backup_root),
-            Message::Saved,
+            move |result| Message::Saved { request, result },
         )
     }
 
-    fn saved(&mut self, result: Result<PathBuf, Failure>) -> Task<Message> {
-        self.busy = None;
-        let after = self.after_save.take();
-        let Some(editor) = self.editor.as_mut() else {
+    fn saved(&mut self, request: u64, result: Result<PathBuf, Failure>) -> Task<Message> {
+        let after = self
+            .after_save
+            .take_if(|(r, _)| *r == request)
+            .map(|(_, pending)| pending);
+        // The document this save belonged to may have been closed or replaced.
+        let Some(editor) = self
+            .editor
+            .as_mut()
+            .filter(|e| e.save_request == Some(request))
+        else {
             return Task::none();
         };
+        self.busy = None;
+        editor.save_request = None;
         match result {
             Ok(backup) => {
                 editor.saved();

@@ -19,6 +19,8 @@ pub struct Editor {
     pub ui: UiState,
     pub dirty: bool,
     pub saving: bool,
+    /// Request number of the save in flight; other save results are ignored.
+    pub save_request: Option<u64>,
     /// Set once the plugin crashed; the document can only be closed.
     pub crashed: Option<String>,
 }
@@ -43,6 +45,7 @@ impl Editor {
             ui,
             dirty: false,
             saving: false,
+            save_request: None,
             crashed: None,
         }
     }

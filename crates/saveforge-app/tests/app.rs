@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use common::World;
 use iced_test::simulator;
-use saveforge_app::documents::{DetectOutcome, detect_file, open_document};
+use saveforge_app::documents::{DetectOutcome, Failure, detect_file, open_document};
 use saveforge_app::home::Saves;
 use saveforge_app::render::UiMessage;
 use saveforge_app::{App, Message, Modal, Pending};
@@ -39,13 +39,21 @@ fn ready_app(world: &World) -> App {
     app
 }
 
+/// Opens `path` the way the UI does: `OpenSave` starts a request, then the
+/// detection and open results are fed back with that request number.
 fn open_in_app(world: &World, app: &mut App, path: &Path) {
-    let DetectOutcome::Open(plugin) = detect_file(&world.services.engine, &world.registry(), path)
-        .unwrap()
-        .outcome
-    else {
-        panic!("fixture did not match");
+    let _ = app.update(Message::OpenSave(path.to_path_buf()));
+    let request = app.open_request().expect("open started");
+    let detected = detect_file(&world.services.engine, &world.registry(), path);
+    let plugin = match &detected.as_ref().unwrap().outcome {
+        DetectOutcome::Open(plugin) => plugin.clone(),
+        other => panic!("fixture did not match: {other:?}"),
     };
+    let _ = app.update(Message::Detected {
+        request,
+        path: path.to_path_buf(),
+        result: detected,
+    });
     let result = open_document(
         &world.services.engine,
         &plugin,
@@ -53,9 +61,18 @@ fn open_in_app(world: &World, app: &mut App, path: &Path) {
         &world.services.tokens,
     );
     let _ = app.update(Message::Opened {
+        request,
         plugin_id: "test-plugin".to_owned(),
         result,
     });
+}
+
+fn saved(app: &mut App, result: Result<PathBuf, Failure>) {
+    let request = app
+        .editor()
+        .and_then(|e| e.save_request)
+        .expect("a save is in flight");
+    let _ = app.update(Message::Saved { request, result });
 }
 
 fn type_text(value: &str) -> Message {
@@ -219,7 +236,7 @@ fn guard_save_then_runs_pending_action_after_save() {
     let _ = app.update(Message::CloseEditor);
     let _ = app.update(Message::GuardSave);
     assert!(app.editor().is_some_and(|e| e.saving));
-    let _ = app.update(Message::Saved(Ok(PathBuf::from("backup.bak"))));
+    saved(&mut app, Ok(PathBuf::from("backup.bak")));
     assert!(
         app.editor().is_none(),
         "pending close should run after save"
@@ -233,9 +250,7 @@ fn failed_save_keeps_editor_and_drops_pending_action() {
     let mut app = dirty_app(&world);
     let _ = app.update(Message::CloseEditor);
     let _ = app.update(Message::GuardSave);
-    let _ = app.update(Message::Saved(Err(saveforge_app::documents::Failure::new(
-        "disk full",
-    ))));
+    saved(&mut app, Err(Failure::new("disk full")));
     let editor = app.editor().expect("editor stays open");
     assert!(!editor.saving);
     assert!(editor.dirty);
@@ -248,8 +263,14 @@ fn tie_shows_plugin_chooser() {
     common::install_fixture(&world.plugins_dir(), "second");
     let mut app = ready_app(&world);
     let path = world.save_file("a.fixture", "hello");
+    let _ = app.update(Message::OpenSave(path.clone()));
+    let request = app.open_request().unwrap();
     let result = detect_file(&world.services.engine, &world.registry(), &path);
-    let _ = app.update(Message::Detected { path, result });
+    let _ = app.update(Message::Detected {
+        request,
+        path,
+        result,
+    });
     assert!(
         matches!(app.modal(), Some(Modal::ChoosePlugin { candidates, .. }) if candidates.len() == 2)
     );
@@ -260,8 +281,15 @@ fn no_match_reports_in_status() {
     let world = World::new();
     let mut app = ready_app(&world);
     let path = world.save_file("a.txt", "hello");
+    let _ = app.update(Message::OpenSave(path.clone()));
+    let request = app.open_request().unwrap();
     let result = detect_file(&world.services.engine, &world.registry(), &path);
-    let _ = app.update(Message::Detected { path, result });
+    let _ = app.update(Message::Detected {
+        request,
+        path,
+        result,
+    });
+    assert_eq!(app.open_request(), None);
     assert_eq!(app.status(), Some("No plugin can open a.txt"));
 }
 
@@ -319,7 +347,7 @@ fn save_list_refreshes_after_a_save() {
         saves: vec![],
     });
     let _ = app.update(Message::Save);
-    let _ = app.update(Message::Saved(Ok(PathBuf::from("backup.bak"))));
+    saved(&mut app, Ok(PathBuf::from("backup.bak")));
     // Size and modified time changed on disk: the list is rescanned.
     assert_eq!(app.home().saves, Saves::Scanning);
 }
@@ -328,17 +356,14 @@ fn save_list_refreshes_after_a_save() {
 fn save_is_ignored_without_editor_or_while_saving() {
     let world = World::new();
     let mut app = ready_app(&world);
-    let _ = app.update(Message::Save);
+    assert_eq!(app.update(Message::Save).units(), 0);
     assert_eq!(app.busy(), None);
 
     let mut app = dirty_app(&world);
-    let _ = app.update(Message::Save);
+    assert_eq!(app.update(Message::Save).units(), 1);
     assert_eq!(app.busy(), Some("Saving…"));
-    let _ = app.update(Message::Saved(Ok(PathBuf::from("b.bak"))));
-    let _ = app.update(Message::Save);
-    let _ = app.update(Message::Save);
-    // The second Save while the first is in flight changes nothing.
-    assert!(app.editor().is_some_and(|e| e.saving));
+    // A second Save while the first is in flight starts no new work.
+    assert_eq!(app.update(Message::Save).units(), 0);
 }
 
 #[test]
@@ -385,4 +410,150 @@ fn cancelled_browse_keeps_typed_path() {
     let _ = app.update(Message::PathChanged("typed".to_owned()));
     let _ = app.update(Message::PathBrowsed(None));
     assert_eq!(app.home().editing.as_deref(), Some("typed"));
+}
+
+fn fixture_plugin(world: &World) -> std::sync::Arc<saveforge_host::LoadedPlugin> {
+    match world.registry().get("test-plugin") {
+        Some(PluginEntry::Loaded(plugin)) => plugin.clone(),
+        other => panic!("fixture not loaded: {other:?}"),
+    }
+}
+
+#[test]
+fn late_open_result_is_ignored() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    let a = world.save_file("a.fixture", "aaa");
+    let b = world.save_file("b.fixture", "bbb");
+    let plugin = fixture_plugin(&world);
+
+    // Click a, then b before a has opened: only b's result may apply.
+    let _ = app.update(Message::OpenSave(a.clone()));
+    let first = app.open_request().unwrap();
+    let _ = app.update(Message::OpenSave(b.clone()));
+    let second = app.open_request().unwrap();
+    assert_ne!(first, second);
+
+    let late_a = open_document(&world.services.engine, &plugin, &a, &world.services.tokens);
+    let _ = app.update(Message::Opened {
+        request: first,
+        plugin_id: "test-plugin".to_owned(),
+        result: late_a,
+    });
+    assert!(app.editor().is_none(), "superseded open must not apply");
+
+    let b_doc = open_document(&world.services.engine, &plugin, &b, &world.services.tokens);
+    let _ = app.update(Message::Opened {
+        request: second,
+        plugin_id: "test-plugin".to_owned(),
+        result: b_doc,
+    });
+    assert_eq!(app.editor().unwrap().file_name(), "b.fixture");
+    assert_eq!(app.busy(), None);
+}
+
+#[test]
+fn late_open_result_does_not_replace_edited_document() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    let plugin = fixture_plugin(&world);
+    let other = world.save_file("b.fixture", "bbb");
+    let stale = open_document(
+        &world.services.engine,
+        &plugin,
+        &other,
+        &world.services.tokens,
+    );
+    open_in_app(&world, &mut app, &world.save_file("a.fixture", "aaa"));
+    let _ = app.update(type_text("edited"));
+    let _ = app.update(Message::Opened {
+        request: 0,
+        plugin_id: "test-plugin".to_owned(),
+        result: stale,
+    });
+    let editor = app.editor().unwrap();
+    assert_eq!(editor.file_name(), "a.fixture");
+    assert!(editor.dirty);
+}
+
+#[test]
+fn switching_plugin_cancels_pending_open() {
+    let world = World::new();
+    common::install_fixture(&world.plugins_dir(), "second");
+    let mut app = ready_app(&world);
+    let a = world.save_file("a.fixture", "aaa");
+    let _ = app.update(Message::OpenSave(a.clone()));
+    let request = app.open_request().unwrap();
+    // "second" sorts first, so it is the selected plugin; switch away from it.
+    assert_eq!(app.home().selected.as_deref(), Some("second"));
+    let _ = app.update(Message::SelectPlugin("test-plugin".to_owned()));
+    assert_eq!(app.open_request(), None);
+    assert_eq!(app.busy(), None);
+    let late = open_document(
+        &world.services.engine,
+        &fixture_plugin(&world),
+        &a,
+        &world.services.tokens,
+    );
+    let _ = app.update(Message::Opened {
+        request,
+        plugin_id: "test-plugin".to_owned(),
+        result: late,
+    });
+    assert!(app.editor().is_none());
+}
+
+#[test]
+fn stale_save_result_does_not_touch_replacement_document() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    open_in_app(&world, &mut app, &world.save_file("a.fixture", "aaa"));
+    let _ = app.update(Message::Save);
+    let a_save = app.editor().and_then(|e| e.save_request).unwrap();
+    let _ = app.update(Message::CloseEditor);
+    open_in_app(&world, &mut app, &world.save_file("b.fixture", "bbb"));
+    let _ = app.update(type_text("edited b"));
+
+    let _ = app.update(Message::Saved {
+        request: a_save,
+        result: Ok(PathBuf::from("a.bak")),
+    });
+    let b = app.editor().unwrap();
+    assert!(b.dirty, "b must keep its unsaved marker");
+    assert_eq!(app.title(), "SaveForge — b.fixture •");
+    assert!(!app.status().is_some_and(|s| s.contains("a.bak")));
+
+    let _ = app.update(Message::Saved {
+        request: a_save,
+        result: Err(Failure {
+            message: "plugin crashed: timed out".to_owned(),
+            plugin_fault: true,
+        }),
+    });
+    assert!(app.editor().unwrap().crashed.is_none());
+}
+
+#[test]
+fn stale_guard_action_does_not_run_on_replacement_document() {
+    let world = World::new();
+    let mut app = dirty_app(&world);
+    // Save-then-close is requested, but the user discards via another guard.
+    let _ = app.update(Message::CloseEditor);
+    let _ = app.update(Message::GuardSave);
+    let a_save = app.editor().and_then(|e| e.save_request).unwrap();
+    let _ = app.update(Message::OpenSave(world.save_file("b.fixture", "bbb")));
+    let _ = app.update(Message::GuardDiscard);
+    open_in_app(&world, &mut app, &world.save_file("c.fixture", "ccc"));
+
+    let _ = app.update(Message::Saved {
+        request: a_save,
+        result: Ok(PathBuf::from("a.bak")),
+    });
+    assert_eq!(
+        app.editor()
+            .map(saveforge_app::editor::Editor::file_name)
+            .as_deref(),
+        Some("c.fixture"),
+        "the old pending close must not close the new document"
+    );
 }
