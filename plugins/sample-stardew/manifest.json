@@ -1,0 +1,17 @@
+{
+  "id": "stardew-like",
+  "name": "StardewLike Save Editor",
+  "version": "0.1.0",
+  "author": "SaveForge Team",
+  "description": "Reference plugin for the schema-driven form helper. Edits saves of the StardewLike sample game.",
+  "apiVersion": "0.1",
+  "minHostVersion": "0.1.0",
+  "maxHostVersion": null,
+  "component": "plugin.wasm",
+  "fileExtensions": [".json"],
+  "defaultSaveDirectories": {
+    "windows": "%APPDATA%/StardewValley/Saves",
+    "linux": "~/.config/StardewValley/Saves",
+    "macos": "~/.config/StardewValley/Saves"
+  }
+}

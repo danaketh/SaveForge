@@ -1,0 +1,28 @@
+{
+  "player": {
+    "name": "Robin",
+    "level": 12,
+    "money": 2500,
+    "married": false,
+    "spouse": "",
+    "stats": {
+      "health": 85,
+      "energy": 100
+    }
+  },
+  "farm": {
+    "name": "Sunny Acres",
+    "type": "riverland"
+  },
+  "inventory": [
+    {
+      "id": "parsnip_seeds",
+      "count": 15
+    },
+    {
+      "id": "copper_ore",
+      "count": 42
+    }
+  ],
+  "playtime_minutes": 1834
+}

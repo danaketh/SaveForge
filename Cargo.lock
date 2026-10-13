@@ -4005,6 +4005,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sample-stardew"
+version = "0.1.0"
+dependencies = [
+ "saveforge-sdk",
+ "serde_json",
+]
+
+[[package]]
 name = "saveforge-app"
 version = "0.1.0"
 dependencies = [

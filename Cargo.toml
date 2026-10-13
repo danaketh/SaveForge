@@ -6,6 +6,7 @@ members = [
     "crates/saveforge-host",
     "crates/saveforge-plugin-api",
     "fixtures/test-plugin",
+    "plugins/sample-stardew",
     "sdk/saveforge-sdk",
     "xtask",
 ]
