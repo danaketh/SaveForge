@@ -23,12 +23,14 @@ pub trait Codec: 'static {
 }
 
 /// Plain JSON files, written back pretty-printed with keys in their
-/// original order.
+/// original order. A leading UTF-8 byte order mark is accepted and not
+/// written back.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct JsonCodec;
 
 impl Codec for JsonCodec {
     fn decode(bytes: &[u8]) -> Result<Value, String> {
+        let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
         serde_json::from_slice(bytes).map_err(|e| format!("not valid JSON: {e}"))
     }
 
@@ -91,12 +93,18 @@ impl<C: Codec> FormDocument<C> {
         for def in fields.iter().filter(|d| self.is_visible(d)) {
             let at = path::join(prefix, &def.key);
             match &def.kind {
-                FieldKind::Object { fields } => self.collect_errors(fields, &at, errors),
+                FieldKind::Object { fields } if self.is_editable_container(&at) => {
+                    self.collect_errors(fields, &at, errors);
+                }
                 FieldKind::List { fields, .. } => {
                     for i in 0..self.list_len(&at) {
-                        self.collect_errors(fields, &path::join(&at, &i.to_string()), errors);
+                        let row = path::join(&at, &i.to_string());
+                        if self.is_editable_container(&row) {
+                            self.collect_errors(fields, &row, errors);
+                        }
                     }
                 }
+                FieldKind::Object { .. } => {}
                 _ => errors.extend(validate(def, path::get(&self.value, &at))),
             }
         }
@@ -106,6 +114,13 @@ impl<C: Codec> FormDocument<C> {
         def.visible_when
             .as_ref()
             .is_none_or(|rule| rule.evaluate(path::get(&self.value, &rule.depends_on)))
+    }
+
+    /// Whether fields under `at` can be edited: it is an object, or missing
+    /// (an edit creates it). Fields under any other value cannot be set, so
+    /// they are not validated either; they would block saving for good.
+    fn is_editable_container(&self, at: &str) -> bool {
+        path::get(&self.value, at).is_none_or(Value::is_object)
     }
 
     fn list_len(&self, at: &str) -> usize {
@@ -224,7 +239,11 @@ impl<C: Codec> FormDocument<C> {
                 read_only: false,
                 ..
             }) => {
-                let json = number_value(value, *decimals);
+                let json = match (number_value(value, *decimals), path::get(&self.value, id)) {
+                    // Keep numbers the save stores as strings as strings.
+                    (Value::Number(n), Some(Value::String(_))) => Value::String(n.to_string()),
+                    (json, _) => json,
+                };
                 path::set(&mut self.value, id, json)
             }
             _ => false,

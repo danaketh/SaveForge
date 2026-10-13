@@ -312,6 +312,52 @@ fn non_object_list_items_render_and_ignore_edits() {
     assert!(field(&tree, "inventory.0.id").is_some());
     edit(&mut doc, text_event("inventory.0.id", "x"));
     assert_eq!(doc.value()["inventory"], json!(["seeds", 7]));
+    assert!(!doc.is_dirty());
+    // Rows the form cannot edit must not block saving the rest.
+    assert!(doc.serialize().is_ok());
+}
+
+#[test]
+fn non_object_containers_do_not_block_saving() {
+    let schema = FormSchema::new().page(FormPage::new("P").section(FormSection::new().field(
+        object("stats", "Stats", vec![text("name", "Name").required()]),
+    )));
+    let doc = Doc::open(schema, br#"{"stats":5}"#).unwrap();
+    assert_eq!(doc.errors(), Vec::<String>::new());
+}
+
+#[test]
+fn bom_prefixed_save_opens() {
+    let mut bytes = b"\xEF\xBB\xBF".to_vec();
+    bytes.extend(sample().to_string().as_bytes());
+    let doc = Doc::open(schema(), &bytes).unwrap();
+    assert_eq!(doc.value(), &sample());
+}
+
+#[test]
+fn numeric_string_edits_keep_the_string_type() {
+    let mut value = sample();
+    value["player"]["level"] = json!("42");
+    let mut doc = open(&value);
+    edit(
+        &mut doc,
+        Event::NumberChanged(("player.level".to_owned(), 42.0)),
+    );
+    assert!(!doc.is_dirty(), "same number is no edit");
+    edit(
+        &mut doc,
+        Event::NumberChanged(("player.level".to_owned(), 50.0)),
+    );
+    assert_eq!(doc.value()["player"]["level"], json!("50"));
+}
+
+#[test]
+fn untouched_floats_round_trip_exactly() {
+    let raw = r#"{"player":{"name":"Robin","level":12},"seed":0.09458110960934567}"#;
+    let mut doc = Doc::open(schema(), raw.as_bytes()).unwrap();
+    edit(&mut doc, text_event("player.name", "Robyn"));
+    let saved = String::from_utf8(doc.serialize().unwrap()).unwrap();
+    assert!(saved.contains("0.09458110960934567"), "{saved}");
 }
 
 #[test]
