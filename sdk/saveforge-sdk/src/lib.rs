@@ -16,6 +16,7 @@ pub mod bindings {
 }
 
 mod adapter;
+pub mod form;
 mod log;
 pub mod ui;
 
