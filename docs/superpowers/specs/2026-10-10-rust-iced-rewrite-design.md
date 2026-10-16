@@ -117,8 +117,8 @@ icon.png        (optional)
   "icon": "icon.png",
   "fileExtensions": [".json"],
   "defaultSaveDirectories": {
-    "windows": "%APPDATA%/MijuGames/The Planet Crafter/Saves",
-    "linux": "{steam_compat:1284190}/AppData/Roaming/MijuGames/The Planet Crafter/Saves",
+    "windows": "%USERPROFILE%/AppData/LocalLow/MijuGames/Planet Crafter",
+    "linux": "{steam_compat:1284190}/AppData/LocalLow/MijuGames/Planet Crafter",
     "macos": null
   },
   "auxFiles": [
@@ -389,7 +389,7 @@ world plugin {
   "pluginDirectory": "<data_dir>/plugins",
   "backupDirectory": "<data_dir>/backups",
   "checkUpdatesOnStartup": true,
-  "pluginSaveDirectories": { "planet-crafter": "%APPDATA%/MijuGames/The Planet Crafter/Saves" }
+  "pluginSaveDirectories": { "planet-crafter": "%USERPROFILE%/AppData/LocalLow/MijuGames/Planet Crafter" }
 }
 ```
 
@@ -404,6 +404,7 @@ Debug builds default `pluginDirectory` to `<workspace>/target/dev-plugins` and `
 | Zip extracted straight into the target dir; partial installs possible | Staging dir and atomic move |
 | Planet Crafter re-serialized typed models; unknown fields outside `WorldObjects` could be lost | Lossless round-trip (§6) |
 | Localization probed hardcoded `C:/D:/E:/F:` paths | Steam library discovery |
+| Planet Crafter default save dir was `%APPDATA%/MijuGames/The Planet Crafter/Saves`, where the game does not save | `%USERPROFILE%/AppData/LocalLow/MijuGames/Planet Crafter` (checked against game version 2.008) |
 | No unsaved-changes guard | Guard modal |
 
 ## 6. Plugins
@@ -411,10 +412,10 @@ Debug builds default `pluginDirectory` to `<workspace>/target/dev-plugins` and `
 ### 6.1 Planet Crafter (`plugins/planet-crafter`)
 
 - **Detection:** extension `.json` and `"terraTokens"` within the first 512 bytes give priority 20. Otherwise no match.
-- **Format:** the file is split on `@` into groups and needs at least 11. Index 11, if present, is the trailing empty group. Within a group, objects are separated by `|` with optional surrounding whitespace. Group order:
+- **Format:** groups are separated by `@` and objects within a group by `|`, with optional whitespace around them. A save may start with a UTF-8 byte order mark (current game versions write one). `@` and `|` inside JSON strings are text, so the file is scanned object by object rather than split. A save needs at least 11 groups. Groups the editor reads:
 
   0. TerraTokens (single)
-  1. Planet (single)
+  1. Planets (one object per planet, e.g. `Prime`, `Humble`)
   2. Players
   3. WorldObjects
   4. Inventories
@@ -422,10 +423,10 @@ Debug builds default `pluginDirectory` to `<workspace>/target/dev-plugins` and `
   6. Messages
   7. StoryEvents
   8. DisplayInfo (single)
-  9. TerrainLayers
-  10. PlanetInstances
 
-- **Lossless round-trip.** Each object is stored as `serde_json::Value` with `preserve_order` and `arbitrary_precision`. The exact separator text between objects in each group and the trailing content are recorded and replayed. Typed accessors (e.g. `player.health()`) read and write the underlying values. **Invariant:** `serialize(parse(x)) == x` byte-for-byte for an unmodified save.
+  The groups after DisplayInfo differ between game versions: 1.x saves have TerrainLayers, PlanetInstances and a trailing empty group; 2.008 saves have planet instances at index 9 and an empty group 10. They are kept verbatim and never interpreted.
+
+- **Lossless round-trip.** Each object keeps its original text and is stored as a `serde_json` map with `preserve_order` and `arbitrary_precision`. Only objects that an edit changed are re-serialized (compact, key order and number text kept); the rest are written from their original text. The exact text between objects (whitespace, separators, BOM) is recorded and replayed. Typed accessors (e.g. `player.health()`) read and write the underlying values. **Invariant:** `serialize(parse(x)) == x` byte-for-byte for an unmodified save.
 - **UI** (parity with `PlanetCrafterEditorView.axaml`). The JSON key is in parentheses.
 
   | Tab | Field | Key | Input | Constraints |
@@ -440,7 +441,7 @@ Debug builds default `pluginDirectory` to `<workspace>/target/dev-plugins` and `
   | Terra Tokens | Terra Tokens | group 0 `terraTokens` | number | ≥ 0, 0 decimals |
   | | All-Time Terra Tokens | group 0 `allTimeTerraTokens` | number | read-only |
   | | Unlocked Groups | group 0 `unlockedGroups` | text | read-only |
-  | Planet State | Oxygen / Heat / Pressure / Plants / Insects / Animals | group 1 `unit{Oxygen,Heat,Pressure,Plants,Insects,Animals}Level` | number | ≥ 0, 2 decimals |
+  | Planet State | Oxygen / Heat / Pressure / Plants / Insects / Animals, one section per planet titled with its `planetId` | group 1 `unit{Oxygen,Heat,Pressure,Plants,Insects,Animals}Level` | number | ≥ 0, 2 decimals |
   | Save Info | Display Name | group 8 `saveDisplayName` | text | max 64 |
   | | Planet ID | group 8 `planetId` | text | read-only |
   | | Crafted Objects | group 5 `craftedObjects` | text | read-only |
@@ -450,7 +451,7 @@ Debug builds default `pluginDirectory` to `<workspace>/target/dev-plugins` and `
   - Add: create a new WorldObject `{ "id": max(existing ids)+1, "gId": <selected> }`, append it to group 3, and append its id to `woIds`. `woIds` is rewritten comma-joined.
   - Remove: remove the id from `woIds` only. The WorldObject stays, as in .NET.
   - **Open question for implementation:** `max+1` ids and orphaned WorldObjects are carried over from .NET unchanged. Before shipping, check them against real saves, since the game may reserve id ranges.
-- **Localization:** the aux file `localization`. Parse `GROUP_NAME_{GId}` keys and take the English (first) value. Known items are sorted by display name, case-insensitively. Without the file, raw GIds are shown, and the add pick-lists offer only GIds already present in the save.
+- **Localization:** the aux file `localization`. Parse `GROUP_NAME_{GId}` keys and take the English (first) value. Known items are sorted by display name, case-insensitively. Without the file, raw GIds are shown, and the add pick-lists offer only GIds already present in the save. Game version 2.008 no longer ships `LocalizationSpaceCrafter.txt` (names live in the Unity assets), so in practice the raw-GId fallback is what users see; the aux file stays optional for older installs.
 
 ### 6.2 Sample Stardew (`plugins/sample-stardew`)
 
