@@ -42,6 +42,9 @@ const LEVELS: [(&str, &str); 6] = [
 
 const DISPLAY_NAME_MAX: usize = 64;
 
+/// Terra Tokens are an `int` in the game; larger values would not load.
+const TERRA_TOKENS_MAX: f64 = 2_147_483_647.0;
+
 #[derive(Debug)]
 pub struct PlanetCrafterDocument {
     save: Save,
@@ -133,7 +136,7 @@ impl PlanetCrafterDocument {
                 "Terra Tokens",
                 float(tokens.get("terraTokens")),
             )
-            .min(0.0)
+            .range(0.0, TERRA_TOKENS_MAX)
             .into(),
             ui::number(
                 ALL_TIME_TOKENS_ID,
@@ -237,7 +240,7 @@ impl PlanetCrafterDocument {
                     .and_then(|index| self.save.planet_mut(index))
                     .is_some_and(|planet| set_float(planet, key, value));
         }
-        if id == TERRA_TOKENS_ID {
+        if id == TERRA_TOKENS_ID && value <= TERRA_TOKENS_MAX {
             return set_whole(self.save.single_mut(TERRA_TOKENS), "terraTokens", value);
         }
         false
@@ -247,7 +250,13 @@ impl PlanetCrafterDocument {
         if id != DISPLAY_NAME_ID {
             return false;
         }
-        let value: String = value.chars().take(DISPLAY_NAME_MAX).collect();
+        // The game's loader may split on `@` and `|` even inside strings, so
+        // they are never written.
+        let value: String = value
+            .chars()
+            .filter(|c| !matches!(c, '@' | '|'))
+            .take(DISPLAY_NAME_MAX)
+            .collect();
         self.save
             .single_mut(DISPLAY_INFO)
             .set("saveDisplayName", Value::String(value))

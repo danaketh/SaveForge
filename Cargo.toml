@@ -32,7 +32,10 @@ saveforge-plugin-api = { path = "crates/saveforge-plugin-api" }
 saveforge-sdk = { path = "sdk/saveforge-sdk" }
 semver = { version = "1.0.28", features = ["serde"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.151"
+# `arbitrary_precision` everywhere so plugins and the app behave the same in
+# every build (Cargo would otherwise unify it in only when Planet Crafter is
+# built alongside).
+serde_json = { version = "1.0.151", features = ["arbitrary_precision"] }
 tempfile = "3.27.0"
 thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["formatting", "macros"] }

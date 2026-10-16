@@ -326,3 +326,32 @@ fn sample_save_view_fits_the_host_limits() {
     assert!(tree.nodes.len() < 2_000, "{} nodes", tree.nodes.len());
     assert!(texts(&tree).iter().all(|t| !t.is_empty()));
 }
+
+#[test]
+fn display_name_drops_group_and_object_separators() {
+    // The game's own loader may split on `@` and `|` without regard to
+    // JSON strings, so the editor never writes them.
+    let mut doc = doc();
+    doc.update(Event::TextChanged((
+        DISPLAY_NAME_ID.to_owned(),
+        "Base @ Lake | 2".to_owned(),
+    )));
+    assert_eq!(
+        saved(&doc).single(8).get("saveDisplayName"),
+        Some(&json!("Base  Lake  2"))
+    );
+}
+
+#[test]
+fn terra_tokens_stay_within_the_game_int_range() {
+    let mut doc = doc();
+    let tree = tab(&mut doc, 1);
+    let Input::Number(tokens) = &field(&tree, TERRA_TOKENS_ID).input else {
+        panic!("terra tokens is not a number");
+    };
+    assert_eq!(tokens.max, Some(f64::from(i32::MAX)));
+    doc.update(num(TERRA_TOKENS_ID, 3_000_000_000.0));
+    assert!(!doc.is_dirty());
+    doc.update(num(TERRA_TOKENS_ID, f64::from(i32::MAX)));
+    assert!(doc.is_dirty());
+}

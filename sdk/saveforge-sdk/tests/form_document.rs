@@ -381,3 +381,17 @@ fn root_must_be_a_json_object() {
     let err = Doc::open(schema(), b"[1, 2]").unwrap_err();
     assert_eq!(err, "the save is not a JSON object");
 }
+
+#[test]
+fn numbers_keep_their_text_when_other_fields_change() {
+    // Same behaviour in every build: `arbitrary_precision` is on workspace
+    // wide, so `1.50` is not rewritten as `1.5` by an unrelated edit.
+    let raw = r#"{"player":{"name":"Robin","level":12,"speed":1.50},"seed":1e400}"#;
+    let mut doc = Doc::open(schema(), raw.as_bytes()).unwrap();
+    edit(&mut doc, text_event("player.name", "Robyn"));
+    let saved = String::from_utf8(doc.serialize().unwrap()).unwrap();
+    assert!(saved.contains(r#""speed": 1.50"#), "{saved}");
+    // Out-of-f64 numbers load and keep their value; serde_json spells the
+    // exponent with an explicit sign.
+    assert!(saved.contains(r#""seed": 1e+400"#), "{saved}");
+}
