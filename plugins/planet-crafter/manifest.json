@@ -1,0 +1,28 @@
+{
+  "id": "planet-crafter",
+  "name": "Planet Crafter Save Editor",
+  "version": "1.0.0",
+  "author": "SaveForge Team",
+  "description": "Edit saves for Planet Crafter.",
+  "apiVersion": "0.1",
+  "minHostVersion": "0.1.0",
+  "maxHostVersion": null,
+  "component": "plugin.wasm",
+  "icon": "icon.png",
+  "fileExtensions": [".json"],
+  "defaultSaveDirectories": {
+    "windows": "%APPDATA%/MijuGames/The Planet Crafter/Saves",
+    "linux": "{steam_compat:1284190}/AppData/Roaming/MijuGames/The Planet Crafter/Saves",
+    "macos": null
+  },
+  "auxFiles": [
+    {
+      "id": "localization",
+      "optional": true,
+      "maxBytes": 8388608,
+      "candidates": [
+        "{steam_app:1284190}/Planet Crafter_Data/Resources/LocalizationSpaceCrafter.txt"
+      ]
+    }
+  ]
+}
