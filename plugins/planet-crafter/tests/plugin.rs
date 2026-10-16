@@ -81,3 +81,19 @@ fn unmodified_sample_serializes_byte_for_byte() {
     assert!(!doc.is_dirty());
     assert_eq!(doc.serialize().unwrap(), sample);
 }
+
+#[test]
+fn manifest_points_at_the_game_save_folder() {
+    let manifest: serde_json::Value =
+        serde_json::from_str(include_str!("../manifest.json")).unwrap();
+    let dirs = &manifest["defaultSaveDirectories"];
+    assert_eq!(
+        dirs["windows"],
+        "%USERPROFILE%/AppData/LocalLow/MijuGames/Planet Crafter"
+    );
+    assert_eq!(
+        dirs["linux"],
+        "{steam_compat:1284190}/AppData/LocalLow/MijuGames/Planet Crafter"
+    );
+    assert!(dirs["macos"].is_null());
+}

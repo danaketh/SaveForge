@@ -11,8 +11,8 @@
   "icon": "icon.png",
   "fileExtensions": [".json"],
   "defaultSaveDirectories": {
-    "windows": "%APPDATA%/MijuGames/The Planet Crafter/Saves",
-    "linux": "{steam_compat:1284190}/AppData/Roaming/MijuGames/The Planet Crafter/Saves",
+    "windows": "%USERPROFILE%/AppData/LocalLow/MijuGames/Planet Crafter",
+    "linux": "{steam_compat:1284190}/AppData/LocalLow/MijuGames/Planet Crafter",
     "macos": null
   },
   "auxFiles": [
