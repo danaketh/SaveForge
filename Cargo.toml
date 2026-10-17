@@ -5,6 +5,7 @@ members = [
     "crates/saveforge-core",
     "crates/saveforge-host",
     "crates/saveforge-plugin-api",
+    "crates/saveforge-store",
     "fixtures/test-plugin",
     "plugins/planet-crafter",
     "plugins/sample-stardew",
@@ -30,6 +31,7 @@ saveforge-core = { path = "crates/saveforge-core" }
 saveforge-host = { path = "crates/saveforge-host" }
 saveforge-plugin-api = { path = "crates/saveforge-plugin-api" }
 saveforge-sdk = { path = "sdk/saveforge-sdk" }
+saveforge-store = { path = "crates/saveforge-store" }
 semver = { version = "1.0.28", features = ["serde"] }
 serde = { version = "1.0.229", features = ["derive"] }
 # `arbitrary_precision` everywhere so plugins and the app behave the same in

@@ -4089,6 +4089,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "saveforge-store"
+version = "0.1.0"
+dependencies = [
+ "saveforge-core",
+ "saveforge-host",
+ "semver",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
