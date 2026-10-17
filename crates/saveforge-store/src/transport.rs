@@ -45,9 +45,9 @@ pub fn agent() -> &'static Agent {
 /// blocking the Store.
 pub fn body_timeout(limit: u64) -> Duration {
     if limit <= MAX_CATALOG_BYTES {
-        Duration::from_secs(60)
+        Duration::from_mins(1)
     } else {
-        Duration::from_secs(600)
+        Duration::from_mins(10)
     }
 }
 

@@ -16,7 +16,7 @@ fn human_sizes() {
 #[test]
 fn modified_time_in_offset() {
     // 2026-10-10 14:03:00 UTC
-    let t = SystemTime::UNIX_EPOCH + Duration::from_secs(1_791_640_980);
+    let t = SystemTime::UNIX_EPOCH + Duration::from_mins(29_860_683);
     assert_eq!(format_modified(t, UtcOffset::UTC), "2026-10-10 14:03");
     let plus_two = UtcOffset::from_hms(2, 0, 0).unwrap();
     assert_eq!(format_modified(t, plus_two), "2026-10-10 16:03");

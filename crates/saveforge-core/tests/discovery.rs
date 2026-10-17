@@ -31,7 +31,7 @@ fn finds_matching_files_recursively_newest_first() {
     assert_eq!(found[0].size_bytes, 2);
     assert_eq!(
         found[0].modified,
-        SystemTime::UNIX_EPOCH + Duration::from_secs(3_000)
+        SystemTime::UNIX_EPOCH + Duration::from_mins(50)
     );
 }
 

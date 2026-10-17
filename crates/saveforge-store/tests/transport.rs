@@ -161,6 +161,6 @@ fn redirects_never_leave_https() {
 
 #[test]
 fn bodies_have_a_time_limit() {
-    assert_eq!(body_timeout(MAX_CATALOG_BYTES), Duration::from_secs(60));
-    assert_eq!(body_timeout(MAX_PACKAGE_BYTES), Duration::from_secs(600));
+    assert_eq!(body_timeout(MAX_CATALOG_BYTES), Duration::from_mins(1));
+    assert_eq!(body_timeout(MAX_PACKAGE_BYTES), Duration::from_mins(10));
 }
