@@ -198,3 +198,15 @@ fn release_catalog_url_points_at_the_latest_release() {
     assert!(RELEASE_CATALOG_URL.starts_with("https://github.com/"));
     assert!(RELEASE_CATALOG_URL.ends_with("/releases/latest/download/catalog.json"));
 }
+
+#[test]
+fn percent_signs_round_trip() {
+    for p in [
+        "C:/Users/a%20b/100%/save.json",
+        "/home/me/50% done/save.json",
+    ] {
+        let url = file_url(Path::new(p));
+        assert!(url.contains("%25"), "{url}");
+        assert_eq!(path_from_file_url(&url), Some(PathBuf::from(p)));
+    }
+}

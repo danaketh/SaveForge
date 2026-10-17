@@ -4301,7 +4301,6 @@ dependencies = [
  "rustls",
  "saveforge-core",
  "saveforge-host",
- "saveforge-plugin-api",
  "semver",
  "serde",
  "serde_json",

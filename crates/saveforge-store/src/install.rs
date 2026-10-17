@@ -8,10 +8,10 @@ use std::fmt::Write as _;
 use std::fs::{self, File};
 use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use saveforge_core::manifest::{PluginManifest, is_safe_relative_path, is_valid_id};
-use saveforge_host::HOST_VERSION;
-use saveforge_plugin_api::API_VERSION;
+use saveforge_host::{API_VERSION, HOST_VERSION};
 use semver::Version;
 use sha2::{Digest, Sha256};
 
@@ -19,6 +19,9 @@ use crate::transport::{MAX_PACKAGE_BYTES, read_url};
 use crate::{CatalogEntry, StoreError};
 
 pub const MAX_EXTRACTED_BYTES: u64 = 256 * 1024 * 1024;
+
+/// Most entries a package may hold.
+pub const MAX_ZIP_ENTRIES: usize = 10_000;
 
 const STAGING: &str = ".staging";
 
@@ -71,31 +74,77 @@ pub fn install(
     let target = plugins_dir
         .join(&entry.id)
         .join(entry.latest_version.to_string());
-    let parent = plugins_dir.join(&entry.id);
-    fs::create_dir_all(&parent).map_err(|e| StoreError::io(&parent, e))?;
-    // The previous copy waits in staging until the new one is in place.
+    move_into_place(staged.path(), &target, &staging, &mut retry_rename)?;
+    // Moved into place: nothing left for the temp dir to clean up.
+    let _ = staged.keep();
+    Ok(target)
+}
+
+/// Renames the staged package dir to `target`. An existing `target` waits in
+/// `staging` until the new one is in place and is moved back if that fails.
+/// If even that fails, the old copy is kept in `staging` (and logged) rather
+/// than deleted, and an `{id}` dir left empty is removed.
+pub fn move_into_place(
+    staged: &Path,
+    target: &Path,
+    staging: &Path,
+    rename: &mut dyn FnMut(&Path, &Path) -> io::Result<()>,
+) -> Result<(), StoreError> {
+    let parent = target.parent().unwrap_or(target);
+    fs::create_dir_all(parent).map_err(|e| StoreError::io(parent, e))?;
     let previous = if target.exists() {
         let holder = tempfile::Builder::new()
             .prefix("old-")
-            .tempdir_in(&staging)
-            .map_err(|e| StoreError::io(&staging, e))?;
+            .tempdir_in(staging)
+            .map_err(|e| StoreError::io(staging, e))?;
         let moved = holder.path().join("old");
-        fs::rename(&target, &moved).map_err(|e| StoreError::io(&target, e))?;
+        rename(target, &moved).map_err(|e| StoreError::io(target, e))?;
         Some((holder, moved))
     } else {
         None
     };
-    if let Err(e) = fs::rename(staged.path(), &target) {
-        if let Some((_, moved)) = &previous
-            && let Err(restore) = fs::rename(moved, &target)
-        {
-            tracing::error!(target = %target.display(), %restore, "could not restore the previous install");
-        }
-        return Err(StoreError::io(&target, e));
+    let Err(e) = rename(staged, target) else {
+        return Ok(());
+    };
+    if let Some((holder, moved)) = previous
+        && let Err(restore) = rename(&moved, target)
+    {
+        let kept = holder.keep();
+        tracing::error!(
+            target = %target.display(),
+            kept = %kept.display(),
+            %restore,
+            "could not restore the previous install; it was kept"
+        );
     }
-    // Moved into place: nothing left for the temp dir to clean up.
-    let _ = staged.keep();
-    Ok(target)
+    // Only removes the dir when empty, i.e. this was a first install.
+    let _ = fs::remove_dir(parent);
+    Err(StoreError::io(target, e))
+}
+
+/// `fs::rename`, retried while the OS reports the files as locked (an
+/// antivirus scanner holding a just-extracted file, on Windows).
+fn retry_rename(from: &Path, to: &Path) -> io::Result<()> {
+    retry(5, Duration::from_millis(200), || fs::rename(from, to))
+}
+
+/// Runs `op` up to `attempts` times, `delay` apart, while it fails with
+/// `PermissionDenied`.
+pub fn retry<T>(
+    attempts: u32,
+    delay: Duration,
+    mut op: impl FnMut() -> io::Result<T>,
+) -> io::Result<T> {
+    let mut attempt = 1;
+    loop {
+        match op() {
+            Err(e) if e.kind() == io::ErrorKind::PermissionDenied && attempt < attempts => {
+                attempt += 1;
+                std::thread::sleep(delay);
+            }
+            result => return result,
+        }
+    }
 }
 
 /// Unpacks a zip into `dest`, rejecting entries that would escape it,
@@ -103,6 +152,11 @@ pub fn install(
 pub fn extract_zip(reader: impl Read + Seek, dest: &Path, limit: u64) -> Result<(), StoreError> {
     let mut archive =
         zip::ZipArchive::new(reader).map_err(|e| StoreError::BadPackage(e.to_string()))?;
+    if archive.len() > MAX_ZIP_ENTRIES {
+        return Err(StoreError::BadPackage(format!(
+            "more than {MAX_ZIP_ENTRIES} entries"
+        )));
+    }
     let mut total = 0u64;
     for index in 0..archive.len() {
         let mut file = archive

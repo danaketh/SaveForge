@@ -5,7 +5,9 @@ use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 
 use common::{entry_for, manifest_json, package, sha256_hex};
-use saveforge_store::install::{extract_zip, install, remove, remove_version};
+use saveforge_store::install::{
+    extract_zip, install, move_into_place, remove, remove_version, retry,
+};
 use saveforge_store::{CatalogEntry, StoreError};
 use semver::Version;
 use tempfile::TempDir;
@@ -253,4 +255,105 @@ fn remove_rejects_bad_ids() {
     remove_version(&world.plugins(), "demo", &Version::new(1, 0, 0)).unwrap();
     assert!(!demo_dir(&world.plugins(), "1.0.0").exists());
     assert!(demo_dir(&world.plugins(), "1.1.0").is_dir());
+}
+
+#[test]
+fn too_many_entries_are_rejected() {
+    let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    for i in 0..=saveforge_store::install::MAX_ZIP_ENTRIES {
+        zip.start_file(format!("f{i}"), options).unwrap();
+    }
+    let bytes = zip.finish().unwrap().into_inner();
+    let dest = tempfile::tempdir().unwrap();
+    match extract_zip(Cursor::new(bytes), dest.path(), 1_000_000) {
+        Err(StoreError::BadPackage(message)) => assert_eq!(message, "more than 10000 entries"),
+        other => panic!("{other:?}"),
+    }
+}
+
+/// A staging dir holding a staged package, and the target it should go to.
+fn staged_install(world: &World) -> (PathBuf, PathBuf, PathBuf) {
+    let staging = world.plugins().join(".staging");
+    let staged = staging.join("pkg");
+    fs::create_dir_all(&staged).unwrap();
+    fs::write(staged.join("new.txt"), b"new").unwrap();
+    (staged, demo_dir(&world.plugins(), "1.0.0"), staging)
+}
+
+fn files_named(dir: &Path, name: &str) -> usize {
+    fs::read_dir(dir).map_or(0, |entries| {
+        entries
+            .flatten()
+            .map(|e| {
+                let path = e.path();
+                if path.is_dir() {
+                    files_named(&path, name)
+                } else {
+                    usize::from(e.file_name() == name)
+                }
+            })
+            .sum()
+    })
+}
+
+#[test]
+fn failed_first_install_leaves_no_empty_plugin_dir() {
+    let world = World::new();
+    let (staged, target, staging) = staged_install(&world);
+    let mut fail = |_: &Path, _: &Path| Err(std::io::Error::other("disk full"));
+    move_into_place(&staged, &target, &staging, &mut fail).unwrap_err();
+    assert!(!world.plugins().join("demo").exists());
+}
+
+#[test]
+fn failed_restore_keeps_the_old_copy() {
+    let world = World::new();
+    let (staged, target, staging) = staged_install(&world);
+    fs::create_dir_all(&target).unwrap();
+    fs::write(target.join("old.txt"), b"old").unwrap();
+    let mut calls = 0;
+    let mut first_only = |from: &Path, to: &Path| {
+        calls += 1;
+        if calls == 1 {
+            fs::rename(from, to)
+        } else {
+            Err(std::io::Error::other("locked"))
+        }
+    };
+    move_into_place(&staged, &target, &staging, &mut first_only).unwrap_err();
+    assert_eq!(files_named(&staging, "old.txt"), 1);
+}
+
+#[test]
+fn denied_renames_are_retried() {
+    use std::io::{Error, ErrorKind};
+    let delay = std::time::Duration::from_millis(1);
+
+    let mut calls = 0;
+    let result = retry(5, delay, || {
+        calls += 1;
+        if calls < 3 {
+            Err(Error::from(ErrorKind::PermissionDenied))
+        } else {
+            Ok(calls)
+        }
+    });
+    assert_eq!(result.unwrap(), 3);
+
+    let mut calls = 0;
+    let result: std::io::Result<()> = retry(5, delay, || {
+        calls += 1;
+        Err(Error::from(ErrorKind::NotFound))
+    });
+    assert!(result.is_err());
+    assert_eq!(calls, 1);
+
+    let mut calls = 0;
+    let result: std::io::Result<()> = retry(5, delay, || {
+        calls += 1;
+        Err(Error::from(ErrorKind::PermissionDenied))
+    });
+    assert!(result.is_err());
+    assert_eq!(calls, 5);
 }

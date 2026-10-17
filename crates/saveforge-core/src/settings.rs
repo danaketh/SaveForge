@@ -162,9 +162,13 @@ fn warning_with_copy(path: &Path, reason: &str) -> String {
     }
 }
 
-/// `file://` URL for a local path (forward slashes, three slashes before a drive letter).
+/// `file://` URL for a local path (forward slashes, three slashes before a
+/// drive letter, `%` escaped so [`path_from_file_url`] reverses it).
 pub fn file_url(path: &Path) -> String {
-    let s = path.to_string_lossy().replace('\\', "/");
+    let s = path
+        .to_string_lossy()
+        .replace('\\', "/")
+        .replace('%', "%25");
     if s.starts_with('/') {
         format!("file://{s}")
     } else {

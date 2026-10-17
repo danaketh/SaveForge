@@ -8,7 +8,6 @@ publish.workspace = true
 [dependencies]
 saveforge-core.workspace = true
 saveforge-host.workspace = true
-saveforge-plugin-api.workspace = true
 rustls.workspace = true
 semver.workspace = true
 serde.workspace = true
