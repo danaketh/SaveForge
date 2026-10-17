@@ -12,8 +12,10 @@ use crate::backup::write_atomic;
 use crate::paths::AppPaths;
 use crate::{CoreError, Result};
 
+/// The catalog the release workflow attaches to the newest GitHub release.
+/// `YOUR_ORG/YOUR_REPO` is a placeholder until the project is published.
 pub const RELEASE_CATALOG_URL: &str =
-    "https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/catalog.json";
+    "https://github.com/YOUR_ORG/YOUR_REPO/releases/latest/download/catalog.json";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

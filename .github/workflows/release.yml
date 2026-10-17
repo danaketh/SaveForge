@@ -1,0 +1,74 @@
+name: Release
+
+# A `v*` tag builds the app for each OS, packages the plugins with a catalog
+# pointing at this release, and publishes everything as release assets.
+# `workflow_dispatch` runs the builds without publishing.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  app:
+    name: app (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            binary: target/release/saveforge.exe
+            asset: saveforge-windows-x64.exe
+          - os: ubuntu-latest
+            binary: target/release/saveforge
+            asset: saveforge-linux-x64
+          - os: macos-latest
+            binary: target/release/saveforge
+            asset: saveforge-macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release -p saveforge-app
+      - shell: bash
+        run: |
+          mkdir -p dist
+          cp "${{ matrix.binary }}" "dist/${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+
+  plugins:
+    name: plugins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo xtask package --base-url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugins
+          path: target/packages/*
+
+  publish:
+    name: publish
+    needs: [app, plugins]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

@@ -192,3 +192,9 @@ fn file_urls_with_a_host_are_rejected() {
         Some(PathBuf::from("C:/a.json"))
     );
 }
+
+#[test]
+fn release_catalog_url_points_at_the_latest_release() {
+    assert!(RELEASE_CATALOG_URL.starts_with("https://github.com/"));
+    assert!(RELEASE_CATALOG_URL.ends_with("/releases/latest/download/catalog.json"));
+}
