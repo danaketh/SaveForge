@@ -176,3 +176,19 @@ fn file_urls_round_trip() {
     );
     assert_eq!(path_from_file_url("https://x/c.json"), None);
 }
+
+#[test]
+fn file_urls_with_a_host_are_rejected() {
+    for url in [
+        "file:////attacker/share/x.zip",
+        "file://attacker/share/x.zip",
+        "file:///%5C%5Cattacker/share/x.zip",
+        "file:///\\\\attacker\\share\\x.zip",
+    ] {
+        assert_eq!(path_from_file_url(url), None, "{url}");
+    }
+    assert_eq!(
+        path_from_file_url("file://localhost/C:/a.json"),
+        Some(PathBuf::from("C:/a.json"))
+    );
+}

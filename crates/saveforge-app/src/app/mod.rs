@@ -16,7 +16,7 @@ use saveforge_core::settings::AppSettings;
 use saveforge_core::tokens::TokenEnv;
 use saveforge_host::{HOST_VERSION, LoadedPlugin, PluginEngine, PluginEntry, PluginRegistry};
 use saveforge_store::cache::{CatalogLoad, CatalogSource, load_catalog};
-use saveforge_store::install::{install, remove, remove_version};
+use saveforge_store::install::remove;
 use saveforge_store::{CatalogEntry, Update};
 use time::UtcOffset;
 
@@ -28,7 +28,7 @@ use crate::format::window_title;
 use crate::home::{Home, Saves, raw_save_dir, resolve_save_dir};
 use crate::render::UiMessage;
 use crate::settings_form::{SettingsField, SettingsForm};
-use crate::store::{CatalogState, Job, JobKind, JobOutcome, StoreState, job_task};
+use crate::store::{CatalogState, Job, JobKind, JobOutcome, StoreState, job_task, run_install};
 
 /// Source repository, linked from About. Placeholder until the project is
 /// published, like `RELEASE_CATALOG_URL`.
@@ -152,6 +152,9 @@ pub enum Message {
         result: Result<JobOutcome, String>,
     },
     UpdatesChecked {
+        /// The catalog URL checked; a result for a URL since replaced in
+        /// Settings is ignored.
+        url: String,
         result: Result<(CatalogLoad, Vec<Update>), String>,
     },
 }
@@ -528,8 +531,8 @@ impl App {
                 self.job_finished(request, result);
                 Task::none()
             }
-            Message::UpdatesChecked { result } => {
-                self.updates_checked(result);
+            Message::UpdatesChecked { url, result } => {
+                self.updates_checked(&url, result);
                 Task::none()
             }
             Message::DismissInfo => {
@@ -537,7 +540,11 @@ impl App {
                 Task::none()
             }
             Message::OpenUrl(url) => {
-                if let Err(e) = open::that_detached(&url) {
+                // Links can come from a catalog: anything but https:// could
+                // start a local program or protocol handler.
+                if !is_web_link(&url) {
+                    self.status = Some(format!("Only https:// links can be opened: {url}"));
+                } else if let Err(e) = open::that_detached(&url) {
                     self.status = Some(format!("Could not open {url}: {e}"));
                 }
                 Task::none()
@@ -714,6 +721,7 @@ impl App {
         };
         let installed = registry.installed_versions();
         let url = self.settings.catalog_url.clone();
+        let checked = url.clone();
         let cache = services.paths.catalog_cache_file();
         self.status = Some(CHECKING_UPDATES.to_owned());
         blocking(
@@ -722,11 +730,21 @@ impl App {
                 let updates = load.catalog.updates(&installed, &HOST_VERSION);
                 Ok((load, updates))
             },
-            |result| Message::UpdatesChecked { result },
+            move |result| Message::UpdatesChecked {
+                url: checked.clone(),
+                result,
+            },
         )
     }
 
-    fn updates_checked(&mut self, result: Result<(CatalogLoad, Vec<Update>), String>) {
+    fn updates_checked(&mut self, url: &str, result: Result<(CatalogLoad, Vec<Update>), String>) {
+        if url != self.settings.catalog_url {
+            // The catalog URL changed in Settings since this check started.
+            if self.status.as_deref() == Some(CHECKING_UPDATES) {
+                self.status = None;
+            }
+            return;
+        }
         match result {
             Ok((load, updates)) => {
                 if self.status.as_deref() == Some(CHECKING_UPDATES) {
@@ -795,18 +813,7 @@ impl App {
                 };
                 request = self.next_request();
                 job_task(request, move |progress| {
-                    install(&entry, &dir, progress).map_err(|e| e.to_string())?;
-                    if let Some(old) = replaced.as_ref().filter(|v| *v != &entry.latest_version)
-                        && let Err(e) = remove_version(&dir, &entry.id, old)
-                    {
-                        tracing::warn!(plugin = %entry.id, %old, error = %e, "could not remove the old version");
-                    }
-                    Ok(JobOutcome::Installed {
-                        entry: PluginRegistry::load_entry(&engine, &dir, &entry.id),
-                        name: entry.name,
-                        version: entry.latest_version,
-                        replaced,
-                    })
+                    run_install(&engine, &dir, &entry, replaced, progress)
                 })
             }
             JobKind::Remove => {
@@ -1028,6 +1035,11 @@ impl App {
             ));
         }
     }
+}
+
+/// A link that is safe to hand to the OS: `https://` only.
+pub(crate) fn is_web_link(url: &str) -> bool {
+    url.starts_with("https://")
 }
 
 /// Runs `work` on tokio's blocking pool and maps its result to a message.

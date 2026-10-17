@@ -27,10 +27,29 @@ static AGENT: LazyLock<Agent> = LazyLock::new(|| {
         .tls_config(tls)
         .timeout_connect(Some(Duration::from_secs(15)))
         .timeout_recv_response(Some(Duration::from_secs(30)))
+        // A redirect must not downgrade to http://, where the catalog (and
+        // with it every checksum) could be rewritten in transit.
+        .https_only(true)
         .user_agent(format!("SaveForge/{}", *HOST_VERSION))
         .build()
         .new_agent()
 });
+
+/// The shared HTTP agent.
+pub fn agent() -> &'static Agent {
+    &AGENT
+}
+
+/// How long a body of up to `limit` bytes may take to arrive: a minute for
+/// a catalog, ten for a package. A stalled connection then fails instead of
+/// blocking the Store.
+pub fn body_timeout(limit: u64) -> Duration {
+    if limit <= MAX_CATALOG_BYTES {
+        Duration::from_secs(60)
+    } else {
+        Duration::from_secs(600)
+    }
+}
 
 /// Streams the body at `url` into `sink` and returns its length.
 ///
@@ -56,7 +75,13 @@ pub fn read_url(
             url: url.to_owned(),
             message,
         };
-        let mut response = AGENT.get(url).call().map_err(|e| http(e.to_string()))?;
+        let mut response = AGENT
+            .get(url)
+            .config()
+            .timeout_recv_body(Some(body_timeout(limit)))
+            .build()
+            .call()
+            .map_err(|e| http(e.to_string()))?;
         let total = response.body().content_length();
         let mut reader = response.body_mut().as_reader();
         copy(url, &mut reader, total, limit, sink, progress, |e| {

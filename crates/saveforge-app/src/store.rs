@@ -4,8 +4,12 @@
 use iced::Task;
 use iced::futures::SinkExt;
 use iced::futures::channel::mpsc;
-use saveforge_host::PluginEntry;
+use std::path::Path;
+
+use saveforge_host::{PluginEngine, PluginEntry, PluginRegistry};
+use saveforge_store::CatalogEntry;
 use saveforge_store::cache::CatalogLoad;
+use saveforge_store::install::{install, remove_version};
 use semver::Version;
 
 use crate::Message;
@@ -68,6 +72,40 @@ pub fn progress_fraction(progress: Option<(u64, Option<u64>)>) -> Option<f32> {
 }
 
 type Progress<'a> = &'a mut dyn FnMut(u64, Option<u64>);
+
+/// Installs `entry` and loads it. For an update, `replaced` is the version
+/// it supersedes: it is removed only once the new version has loaded, and a
+/// new version that fails to load is removed instead, keeping the old one.
+pub fn run_install(
+    engine: &PluginEngine,
+    plugins_dir: &Path,
+    entry: &CatalogEntry,
+    replaced: Option<Version>,
+    progress: Progress<'_>,
+) -> Result<JobOutcome, String> {
+    install(entry, plugins_dir, progress).map_err(|e| e.to_string())?;
+    let loaded = PluginRegistry::load_entry(engine, plugins_dir, &entry.id);
+    if let Some(old) = replaced.as_ref().filter(|v| **v != entry.latest_version) {
+        if let PluginEntry::Failed { reason, .. } = &loaded {
+            if let Err(e) = remove_version(plugins_dir, &entry.id, &entry.latest_version) {
+                tracing::warn!(plugin = %entry.id, error = %e, "could not remove the failed version");
+            }
+            return Err(format!(
+                "{} {} could not be loaded ({reason}); keeping {old}.",
+                entry.name, entry.latest_version
+            ));
+        }
+        if let Err(e) = remove_version(plugins_dir, &entry.id, old) {
+            tracing::warn!(plugin = %entry.id, %old, error = %e, "could not remove the old version");
+        }
+    }
+    Ok(JobOutcome::Installed {
+        entry: loaded,
+        name: entry.name.clone(),
+        version: entry.latest_version.clone(),
+        replaced,
+    })
+}
 
 /// Runs `work` on the blocking pool, streaming its progress as
 /// [`Message::JobProgress`] and finishing with [`Message::JobFinished`].

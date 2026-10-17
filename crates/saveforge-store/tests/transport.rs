@@ -1,10 +1,13 @@
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 
 use saveforge_core::settings::file_url;
 use saveforge_store::StoreError;
 use saveforge_store::cache::{CatalogSource, load_catalog};
-use saveforge_store::transport::read_url;
+use saveforge_store::transport::{
+    MAX_CATALOG_BYTES, MAX_PACKAGE_BYTES, agent, body_timeout, read_url,
+};
 
 const CATALOG: &str = r#"{"schemaVersion":"1","plugins":[{"id":"demo","name":"Demo","author":"Me",
 "latestVersion":"1.0.0","minHostVersion":"0.1.0","packageUrl":"https://example.com/demo.zip",
@@ -123,4 +126,41 @@ fn invalid_online_catalog_falls_back_to_cache() {
         (CatalogSource::Cached, vec!["cached".into()])
     );
     assert_eq!(fs::read_to_string(&cache).unwrap(), CACHED);
+}
+
+const MIXED: &str = r#"{"schemaVersion":"1","plugins":[
+{"id":"remote","name":"Remote","author":"Me","latestVersion":"1.0.0","minHostVersion":"0.1.0",
+"packageUrl":"https://example.com/remote.zip","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+{"id":"local","name":"Local","author":"Me","latestVersion":"1.0.0","minHostVersion":"0.1.0",
+"packageUrl":"file:////attacker/share/local.zip","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}]}"#;
+
+#[test]
+fn https_catalogs_cannot_point_at_local_packages() {
+    let dir = tempfile::tempdir().unwrap();
+    let cache = dir.path().join("catalog-cache.json");
+    fs::write(&cache, MIXED).unwrap();
+    // Nothing listens on port 1, so the fetch fails at once and the cache is used.
+    let load = load_catalog("https://127.0.0.1:1/catalog.json", &cache).unwrap();
+    assert_eq!(load.source, CatalogSource::Cached);
+    let ids: Vec<&str> = load.catalog.plugins.iter().map(|e| e.id.as_str()).collect();
+    assert_eq!(ids, ["remote"]);
+
+    let local = dir.path().join("catalog.json");
+    fs::write(&local, MIXED).unwrap();
+    assert_eq!(ids_of(&local, &cache).len(), 2);
+}
+
+fn ids_of(path: &Path, cache: &Path) -> Vec<String> {
+    ids(path, cache).1
+}
+
+#[test]
+fn redirects_never_leave_https() {
+    assert!(agent().config().https_only());
+}
+
+#[test]
+fn bodies_have_a_time_limit() {
+    assert_eq!(body_timeout(MAX_CATALOG_BYTES), Duration::from_secs(60));
+    assert_eq!(body_timeout(MAX_PACKAGE_BYTES), Duration::from_secs(600));
 }

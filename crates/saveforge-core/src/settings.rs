@@ -171,19 +171,15 @@ pub fn file_url(path: &Path) -> String {
 }
 
 /// Inverse of [`file_url`]: the local path a `file://` URL names, with `%XX`
-/// escapes decoded. `None` for any other scheme.
+/// escapes decoded. `None` for any other scheme, and for URLs naming another
+/// host or a UNC share (`file://host/…`, `file:////host/…`): opening those
+/// would reach out over the network.
 pub fn path_from_file_url(url: &str) -> Option<PathBuf> {
     let rest = url.strip_prefix("file://")?;
-    let bytes = rest.as_bytes();
-    let rest = if bytes.len() >= 3
-        && bytes[0] == b'/'
-        && bytes[1].is_ascii_alphabetic()
-        && bytes[2] == b':'
-    {
-        &rest[1..]
-    } else {
-        rest
-    };
+    let rest = rest.strip_prefix("localhost").unwrap_or(rest);
+    if !rest.starts_with('/') {
+        return None;
+    }
     let mut decoded = Vec::with_capacity(rest.len());
     let mut bytes = rest.bytes();
     while let Some(b) = bytes.next() {
@@ -195,7 +191,17 @@ pub fn path_from_file_url(url: &str) -> Option<PathBuf> {
             decoded.push(b);
         }
     }
-    String::from_utf8(decoded).ok().map(PathBuf::from)
+    let path = String::from_utf8(decoded).ok()?;
+    let bytes = path.as_bytes();
+    let path = if bytes.len() >= 3 && bytes[1].is_ascii_alphabetic() && bytes[2] == b':' {
+        &path[1..]
+    } else {
+        &path
+    };
+    if path.starts_with(['/', '\\']) && path[1..].starts_with(['/', '\\']) {
+        return None;
+    }
+    Some(PathBuf::from(path))
 }
 
 fn default_catalog_url(paths: &AppPaths) -> String {

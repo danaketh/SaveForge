@@ -7,7 +7,7 @@ use iced::{Alignment, Element, Font, Length, font};
 use saveforge_host::HOST_VERSION;
 use saveforge_store::{Catalog, CatalogEntry, EntryStatus};
 
-use super::{App, Message, Screen};
+use super::{App, Message, Screen, is_web_link};
 use crate::store::{CatalogState, progress_fraction};
 use crate::theme;
 
@@ -116,7 +116,7 @@ impl App {
                     .style(theme::muted),
             );
         }
-        if let Some(url) = &entry.repository_url {
+        if let Some(url) = entry.repository_url.as_ref().filter(|url| is_web_link(url)) {
             col = col.push(
                 button(text("Repository").size(12))
                     .style(button::secondary)

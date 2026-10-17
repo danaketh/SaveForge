@@ -23,7 +23,18 @@ pub struct CatalogLoad {
 /// Fetches and parses the catalog at `url`, caching the raw text at
 /// `cache_path`. On any fetch or parse failure, the cache is used instead;
 /// with no usable cache, the original error is returned.
+///
+/// An `https://` catalog keeps only `https://` packages, whichever copy is
+/// used.
 pub fn load_catalog(url: &str, cache_path: &Path) -> Result<CatalogLoad, StoreError> {
+    let mut load = load_any(url, cache_path)?;
+    if url.starts_with("https://") {
+        load.catalog.keep_https_packages();
+    }
+    Ok(load)
+}
+
+fn load_any(url: &str, cache_path: &Path) -> Result<CatalogLoad, StoreError> {
     let error = match fetch(url) {
         Ok((catalog, text)) => {
             if let Err(e) = write_cache(cache_path, &text) {

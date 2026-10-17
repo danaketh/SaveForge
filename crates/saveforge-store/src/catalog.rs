@@ -95,6 +95,18 @@ impl Catalog {
         })
     }
 
+    /// Drops entries whose package is not on `https://`. A remote catalog
+    /// must not point at local files or network shares.
+    pub fn keep_https_packages(&mut self) {
+        self.plugins.retain(|entry| {
+            let keep = entry.package_url.starts_with("https://");
+            if !keep {
+                tracing::warn!(plugin = %entry.id, url = %entry.package_url, "skipping non-https package in an https catalog");
+            }
+            keep
+        });
+    }
+
     pub fn entry(&self, id: &str) -> Option<&CatalogEntry> {
         self.plugins.iter().find(|e| e.id == id)
     }

@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 
 use common::World;
 use iced_test::simulator;
-use saveforge_app::store::{JobOutcome, progress_fraction};
+use saveforge_app::settings_form::SettingsField;
+use saveforge_app::store::{JobOutcome, progress_fraction, run_install};
 use saveforge_app::{App, Message, Screen};
 use saveforge_core::paths::AppPaths;
 use saveforge_core::settings::{AppSettings, file_url};
@@ -61,18 +62,24 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 /// A zip of the fixture plugin whose manifest says `id`.
 fn fixture_package(id: &str) -> Vec<u8> {
+    package_with(id, "0.1.0", &fs::read(common::fixture_wasm()).unwrap())
+}
+
+/// A zip of the fixture manifest as `id` at `version`, with `wasm` as its
+/// component.
+fn package_with(id: &str, version: &str, wasm: &[u8]) -> Vec<u8> {
     let manifest_path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/test-plugin/manifest.json");
     let mut manifest: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(manifest_path).unwrap()).unwrap();
     manifest["id"] = serde_json::Value::from(id);
+    manifest["version"] = serde_json::Value::from(version);
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let options = zip::write::SimpleFileOptions::default();
     zip.start_file("manifest.json", options).unwrap();
     zip.write_all(manifest.to_string().as_bytes()).unwrap();
     zip.start_file("plugin.wasm", options).unwrap();
-    zip.write_all(&fs::read(common::fixture_wasm()).unwrap())
-        .unwrap();
+    zip.write_all(wasm).unwrap();
     zip.finish().unwrap().into_inner()
 }
 
@@ -420,6 +427,7 @@ fn startup_update_check_reports_updates() {
         latest: Version::new(0, 2, 0),
     };
     let _ = app.update(Message::UpdatesChecked {
+        url: app.settings().catalog_url.clone(),
         result: Ok((catalog_load(&world), vec![update])),
     });
     assert_eq!(
@@ -440,11 +448,134 @@ fn failed_update_check_points_to_settings() {
     s.check_updates_on_startup = true;
     let mut app = app_with(&world, s);
     let _ = app.update(Message::UpdatesChecked {
+        url: app.settings().catalog_url.clone(),
         result: Err("offline".to_owned()),
     });
     assert_eq!(
         app.status(),
         Some("Update check failed. Retry in Settings.")
     );
+    assert_eq!(app.info(), None);
+}
+
+#[test]
+fn catalog_links_must_be_https() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    let _ = app.update(Message::Navigate(Screen::Store));
+    let request = app.catalog_request().unwrap();
+    let mut load = catalog_load(&world);
+    load.catalog.plugins[1].repository_url = Some("file:///C:/Windows/System32/calc.exe".into());
+    let _ = app.update(Message::CatalogLoaded {
+        request,
+        result: Ok(load),
+    });
+    let _ = app.update(Message::Navigate(Screen::PluginDetail("other".to_owned())));
+    {
+        let mut ui = simulator(app.view());
+        assert!(ui.find("Other Plugin").is_ok());
+        assert!(ui.find("Repository").is_err());
+    }
+    let _ = app.update(Message::OpenUrl("ms-msdt:/id PCWDiagnostic".to_owned()));
+    assert_eq!(
+        app.status(),
+        Some("Only https:// links can be opened: ms-msdt:/id PCWDiagnostic")
+    );
+}
+
+/// An entry for `test-plugin` at `version` whose package is `bytes`.
+fn update_entry(world: &World, version: &str, bytes: &[u8]) -> saveforge_store::CatalogEntry {
+    let path = world.dir.path().join(format!("test-plugin-{version}.zip"));
+    fs::write(&path, bytes).unwrap();
+    let text = format!(
+        r#"{{"schemaVersion":"1","plugins":[{{"id":"test-plugin","name":"Test Plugin",
+"author":"SaveForge","latestVersion":"{version}","minHostVersion":"0.1.0",
+"packageUrl":"{}","sha256":"{}"}}]}}"#,
+        file_url(&path),
+        sha256_hex(bytes)
+    );
+    Catalog::parse(&text).unwrap().plugins.remove(0)
+}
+
+#[test]
+fn update_that_fails_to_load_keeps_the_old_version() {
+    let world = World::new();
+    let entry = update_entry(
+        &world,
+        "0.2.0",
+        &package_with("test-plugin", "0.2.0", b"not wasm"),
+    );
+    let result = run_install(
+        &world.services.engine,
+        &world.plugins_dir(),
+        &entry,
+        Some(Version::new(0, 1, 0)),
+        &mut |_, _| {},
+    );
+    let err = result.unwrap_err();
+    assert!(err.contains("could not be loaded"), "{err}");
+    assert!(
+        world
+            .plugins_dir()
+            .join("test-plugin/0.1.0/plugin.wasm")
+            .is_file()
+    );
+    assert!(!world.plugins_dir().join("test-plugin/0.2.0").exists());
+}
+
+#[test]
+fn successful_update_removes_the_old_version() {
+    let world = World::new();
+    let wasm = fs::read(common::fixture_wasm()).unwrap();
+    let entry = update_entry(
+        &world,
+        "0.2.0",
+        &package_with("test-plugin", "0.2.0", &wasm),
+    );
+    let outcome = run_install(
+        &world.services.engine,
+        &world.plugins_dir(),
+        &entry,
+        Some(Version::new(0, 1, 0)),
+        &mut |_, _| {},
+    )
+    .unwrap();
+    assert!(matches!(
+        outcome,
+        JobOutcome::Installed {
+            entry: PluginEntry::Loaded(_),
+            replaced: Some(_),
+            ..
+        }
+    ));
+    assert!(!world.plugins_dir().join("test-plugin/0.1.0").exists());
+    assert!(world.plugins_dir().join("test-plugin/0.2.0").is_dir());
+}
+
+#[test]
+fn stale_update_check_does_not_restore_the_old_catalog() {
+    let world = World::new();
+    let mut s = settings(&world);
+    s.check_updates_on_startup = true;
+    let mut app = app_with(&world, s);
+    let old_url = app.settings().catalog_url.clone();
+    let _ = app.update(Message::Navigate(Screen::Settings));
+    let new_url = file_url(&world.dir.path().join("elsewhere.json"));
+    let _ = app.update(Message::SettingsEdited(SettingsField::CatalogUrl, new_url));
+    let _ = app.update(Message::SaveSettings);
+    let update = Update {
+        id: "test-plugin".to_owned(),
+        name: "Test Plugin".to_owned(),
+        installed: Version::new(0, 1, 0),
+        latest: Version::new(0, 2, 0),
+    };
+    let _ = app.update(Message::UpdatesChecked {
+        url: old_url,
+        result: Ok((catalog_load(&world), vec![update])),
+    });
+    assert!(matches!(
+        app.store().catalog,
+        saveforge_app::store::CatalogState::NotLoaded
+    ));
     assert_eq!(app.info(), None);
 }

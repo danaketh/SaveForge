@@ -118,6 +118,7 @@ fn info_bar_can_be_dismissed() {
         latest: Version::new(0, 2, 0),
     };
     let _ = app.update(Message::UpdatesChecked {
+        url: app.settings().catalog_url.clone(),
         result: Ok((load, vec![update])),
     });
     assert_ne!(app.info(), None);
