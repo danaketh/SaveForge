@@ -386,7 +386,7 @@ world plugin {
 
 ```json
 {
-  "catalogUrl": "https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/catalog.json",
+  "catalogUrl": "https://github.com/YOUR_ORG/YOUR_REPO/releases/latest/download/catalog.json",
   "pluginDirectory": "<data_dir>/plugins",
   "backupDirectory": "<data_dir>/backups",
   "checkUpdatesOnStartup": true,
