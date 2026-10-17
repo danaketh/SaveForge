@@ -2,6 +2,7 @@
 //! `view.rs`.
 
 mod settings_view;
+mod store_view;
 mod view;
 
 use std::path::PathBuf;
@@ -13,7 +14,10 @@ use saveforge_core::paths::AppPaths;
 use saveforge_core::platform::Os;
 use saveforge_core::settings::AppSettings;
 use saveforge_core::tokens::TokenEnv;
-use saveforge_host::{LoadedPlugin, PluginEngine, PluginEntry, PluginRegistry};
+use saveforge_host::{HOST_VERSION, LoadedPlugin, PluginEngine, PluginEntry, PluginRegistry};
+use saveforge_store::cache::{CatalogLoad, CatalogSource, load_catalog};
+use saveforge_store::install::{install, remove, remove_version};
+use saveforge_store::{CatalogEntry, Update};
 use time::UtcOffset;
 
 use crate::documents::{
@@ -24,10 +28,13 @@ use crate::format::window_title;
 use crate::home::{Home, Saves, raw_save_dir, resolve_save_dir};
 use crate::render::UiMessage;
 use crate::settings_form::{SettingsField, SettingsForm};
+use crate::store::{CatalogState, Job, JobKind, JobOutcome, StoreState, job_task};
 
 /// Source repository, linked from About. Placeholder until the project is
 /// published, like `RELEASE_CATALOG_URL`.
 pub const REPOSITORY_URL: &str = "https://github.com/YOUR_ORG/YOUR_REPO";
+
+const CHECKING_UPDATES: &str = "Checking for plugin updates…";
 
 /// The page shown in the main area (spec §5.1). An open document lives on
 /// `Home` and survives visits to the other screens.
@@ -126,6 +133,27 @@ pub enum Message {
     SettingsDirBrowsed(SettingsField, Option<PathBuf>),
     SaveSettings,
     CheckUpdatesNow,
+    CatalogLoaded {
+        request: u64,
+        result: Result<CatalogLoad, String>,
+    },
+    RefreshCatalog,
+    StoreSearch(String),
+    InstallPlugin(String),
+    UpdatePlugin(String),
+    RemovePlugin(String),
+    JobProgress {
+        request: u64,
+        done: u64,
+        total: Option<u64>,
+    },
+    JobFinished {
+        request: u64,
+        result: Result<JobOutcome, String>,
+    },
+    UpdatesChecked {
+        result: Result<(CatalogLoad, Vec<Update>), String>,
+    },
 }
 
 #[derive(Debug)]
@@ -135,6 +163,12 @@ pub struct App {
     settings: AppSettings,
     settings_form: SettingsForm,
     plugins: Plugins,
+    /// Where the registry was scanned from; Store jobs install here. A
+    /// Settings change only applies after a restart.
+    plugin_dir: PathBuf,
+    store: StoreState,
+    /// The catalog load whose result is still wanted; others are stale.
+    catalog_request: Option<u64>,
     screen: Screen,
     home: Home,
     editor: Option<Editor>,
@@ -164,8 +198,11 @@ impl App {
             services: Some(services),
             fatal: None,
             settings_form: SettingsForm::from_settings(&settings),
+            plugin_dir: plugin_dir.clone(),
             settings,
             plugins: Plugins::Loading,
+            store: StoreState::default(),
+            catalog_request: None,
             screen: Screen::Home,
             home: Home::default(),
             editor: None,
@@ -190,8 +227,11 @@ impl App {
             services: None,
             fatal: Some(reason),
             settings_form: SettingsForm::from_settings(&settings),
+            plugin_dir: settings.plugin_directory.clone(),
             settings,
             plugins: Plugins::Ready(PluginRegistry::default()),
+            store: StoreState::default(),
+            catalog_request: None,
             screen: Screen::Home,
             home: Home::default(),
             editor: None,
@@ -249,6 +289,15 @@ impl App {
         &self.settings
     }
 
+    pub fn store(&self) -> &StoreState {
+        &self.store
+    }
+
+    /// The request number of the catalog load in progress, if any.
+    pub fn catalog_request(&self) -> Option<u64> {
+        self.catalog_request
+    }
+
     pub fn settings_form(&self) -> &SettingsForm {
         &self.settings_form
     }
@@ -281,7 +330,12 @@ impl App {
                 self.busy = None;
                 let first = registry.loaded().next().map(|p| p.manifest.id.clone());
                 self.plugins = Plugins::Ready(registry);
-                first.map_or_else(Task::none, |id| self.select_plugin(id))
+                let select = first.map_or_else(Task::none, |id| self.select_plugin(id));
+                if self.settings.check_updates_on_startup {
+                    Task::batch([select, self.start_update_check()])
+                } else {
+                    select
+                }
             }
             Message::SelectPlugin(id) => {
                 self.screen = Screen::Home;
@@ -409,8 +463,18 @@ impl App {
                 if screen == Screen::Settings {
                     self.settings_form = SettingsForm::from_settings(&self.settings);
                 }
+                let load = matches!(screen, Screen::Store | Screen::PluginDetail(_))
+                    && self.catalog_request.is_none()
+                    && matches!(
+                        self.store.catalog,
+                        CatalogState::NotLoaded | CatalogState::Failed(_)
+                    );
                 self.screen = screen;
-                Task::none()
+                if load {
+                    self.start_catalog_load()
+                } else {
+                    Task::none()
+                }
             }
             Message::SettingsEdited(field, value) => {
                 *self.settings_form.field_mut(field) = value;
@@ -437,8 +501,35 @@ impl App {
                 self.save_settings();
                 Task::none()
             }
-            Message::CheckUpdatesNow => {
-                self.status = Some("Checking for plugin updates…".to_owned());
+            Message::CheckUpdatesNow => self.start_update_check(),
+            Message::CatalogLoaded { request, result } => {
+                self.catalog_loaded(request, result);
+                Task::none()
+            }
+            Message::RefreshCatalog => self.start_catalog_load(),
+            Message::StoreSearch(query) => {
+                self.store.query = query;
+                Task::none()
+            }
+            Message::InstallPlugin(id) => self.start_job(JobKind::Install, id),
+            Message::UpdatePlugin(id) => self.start_job(JobKind::Update, id),
+            Message::RemovePlugin(id) => self.start_job(JobKind::Remove, id),
+            Message::JobProgress {
+                request,
+                done,
+                total,
+            } => {
+                if let Some(job) = self.store.job.as_mut().filter(|j| j.request == request) {
+                    job.progress = Some((done, total));
+                }
+                Task::none()
+            }
+            Message::JobFinished { request, result } => {
+                self.job_finished(request, result);
+                Task::none()
+            }
+            Message::UpdatesChecked { result } => {
+                self.updates_checked(result);
                 Task::none()
             }
             Message::DismissInfo => {
@@ -560,7 +651,12 @@ impl App {
         if !self.settings_form.errors.is_empty() {
             return;
         }
+        let old_catalog_url = self.settings.catalog_url.clone();
         let plugin_dir_changed = self.settings_form.apply(&mut self.settings);
+        if self.settings.catalog_url != old_catalog_url {
+            self.store.catalog = CatalogState::NotLoaded;
+            self.catalog_request = None;
+        }
         let Some(services) = &self.services else {
             return;
         };
@@ -573,6 +669,206 @@ impl App {
                 tracing::warn!(error = %e, "could not save settings");
                 format!("Could not save settings ({e}); changes kept for this session.")
             }
+        });
+    }
+
+    fn start_catalog_load(&mut self) -> Task<Message> {
+        let Some(services) = &self.services else {
+            return Task::none();
+        };
+        let url = self.settings.catalog_url.clone();
+        let cache = services.paths.catalog_cache_file();
+        let request = self.next_request();
+        self.catalog_request = Some(request);
+        self.store.catalog = CatalogState::Loading;
+        blocking(
+            move || load_catalog(&url, &cache).map_err(|e| e.to_string()),
+            move |result| Message::CatalogLoaded { request, result },
+        )
+    }
+
+    fn catalog_loaded(&mut self, request: u64, result: Result<CatalogLoad, String>) {
+        if self.catalog_request != Some(request) {
+            return;
+        }
+        self.catalog_request = None;
+        self.store.catalog = match result {
+            Ok(load) => {
+                if load.source == CatalogSource::Cached {
+                    self.status = Some("Offline: showing the cached catalog.".to_owned());
+                }
+                CatalogState::Ready(load)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "catalog load failed");
+                CatalogState::Failed(e)
+            }
+        };
+    }
+
+    /// Fetches the catalog and compares it with what is installed (spec §5.2
+    /// Startup step 4).
+    fn start_update_check(&mut self) -> Task<Message> {
+        let (Some(services), Some(registry)) = (&self.services, self.registry()) else {
+            return Task::none();
+        };
+        let installed = registry.installed_versions();
+        let url = self.settings.catalog_url.clone();
+        let cache = services.paths.catalog_cache_file();
+        self.status = Some(CHECKING_UPDATES.to_owned());
+        blocking(
+            move || {
+                let load = load_catalog(&url, &cache).map_err(|e| e.to_string())?;
+                let updates = load.catalog.updates(&installed, &HOST_VERSION);
+                Ok((load, updates))
+            },
+            |result| Message::UpdatesChecked { result },
+        )
+    }
+
+    fn updates_checked(&mut self, result: Result<(CatalogLoad, Vec<Update>), String>) {
+        match result {
+            Ok((load, updates)) => {
+                if self.status.as_deref() == Some(CHECKING_UPDATES) {
+                    self.status = None;
+                }
+                if !updates.is_empty() {
+                    self.info = Some(format!(
+                        "Updates available for {} plugin(s). Go to Store to update.",
+                        updates.len()
+                    ));
+                }
+                if self.catalog_request.is_none() {
+                    self.store.catalog = CatalogState::Ready(load);
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "update check failed");
+                self.status = Some("Update check failed. Retry in Settings.".to_owned());
+            }
+        }
+    }
+
+    fn catalog_entry(&self, id: &str) -> Option<&CatalogEntry> {
+        match &self.store.catalog {
+            CatalogState::Ready(load) => load.catalog.entry(id),
+            _ => None,
+        }
+    }
+
+    /// The catalog name, else the installed manifest's name, else the id.
+    fn plugin_name(&self, id: &str) -> String {
+        self.catalog_entry(id)
+            .map(|entry| entry.name.clone())
+            .or_else(|| self.loaded_plugin(id).map(|p| p.manifest.name.clone()))
+            .unwrap_or_else(|| id.to_owned())
+    }
+
+    /// Starts an install, update or remove; ignored while another job runs.
+    fn start_job(&mut self, kind: JobKind, id: String) -> Task<Message> {
+        if self.store.job.is_some() {
+            return Task::none();
+        }
+        let Some(engine) = self.services.as_ref().map(|s| Arc::clone(&s.engine)) else {
+            return Task::none();
+        };
+        if kind == JobKind::Remove && self.editor.as_ref().is_some_and(|e| e.plugin_id == id) {
+            self.status = Some(format!(
+                "Close the open save before removing {}.",
+                self.plugin_name(&id)
+            ));
+            return Task::none();
+        }
+        let dir = self.plugin_dir.clone();
+        let request;
+        let task = match kind {
+            JobKind::Install | JobKind::Update => {
+                let Some(entry) = self.catalog_entry(&id).cloned() else {
+                    return Task::none();
+                };
+                let replaced = if kind == JobKind::Update {
+                    self.registry()
+                        .and_then(|r| r.get(&id))
+                        .and_then(PluginEntry::version)
+                } else {
+                    None
+                };
+                request = self.next_request();
+                job_task(request, move |progress| {
+                    install(&entry, &dir, progress).map_err(|e| e.to_string())?;
+                    if let Some(old) = replaced.as_ref().filter(|v| *v != &entry.latest_version)
+                        && let Err(e) = remove_version(&dir, &entry.id, old)
+                    {
+                        tracing::warn!(plugin = %entry.id, %old, error = %e, "could not remove the old version");
+                    }
+                    Ok(JobOutcome::Installed {
+                        entry: PluginRegistry::load_entry(&engine, &dir, &entry.id),
+                        name: entry.name,
+                        version: entry.latest_version,
+                        replaced,
+                    })
+                })
+            }
+            JobKind::Remove => {
+                let name = self.plugin_name(&id);
+                let plugin = id.clone();
+                request = self.next_request();
+                job_task(request, move |_| {
+                    remove(&dir, &plugin).map_err(|e| e.to_string())?;
+                    Ok(JobOutcome::Removed { id: plugin, name })
+                })
+            }
+        };
+        self.store.job = Some(Job {
+            request,
+            plugin_id: id,
+            kind,
+            progress: None,
+        });
+        task
+    }
+
+    fn job_finished(&mut self, request: u64, result: Result<JobOutcome, String>) {
+        if self
+            .store
+            .job
+            .as_ref()
+            .is_none_or(|job| job.request != request)
+        {
+            return;
+        }
+        self.store.job = None;
+        let Plugins::Ready(registry) = &mut self.plugins else {
+            return;
+        };
+        self.status = Some(match result {
+            Ok(JobOutcome::Installed {
+                entry,
+                name,
+                version,
+                replaced,
+            }) => {
+                let failed = match &entry {
+                    PluginEntry::Failed { reason, .. } => Some(reason.clone()),
+                    PluginEntry::Loaded(_) => None,
+                };
+                registry.upsert(entry);
+                match (failed, replaced) {
+                    (Some(reason), _) => {
+                        format!("Installed {name} {version}, but it could not be loaded: {reason}")
+                    }
+                    (None, Some(_)) => format!("Updated {name} to {version}."),
+                    (None, None) => format!("Installed {name} {version}."),
+                }
+            }
+            Ok(JobOutcome::Removed { id, name }) => {
+                registry.remove(&id);
+                if self.home.selected.as_deref() == Some(id.as_str()) {
+                    self.home = Home::default();
+                }
+                format!("Removed {name}.")
+            }
+            Err(e) => e,
         });
     }
 

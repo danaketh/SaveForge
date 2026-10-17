@@ -4232,13 +4232,17 @@ dependencies = [
  "saveforge-core",
  "saveforge-host",
  "saveforge-plugin-api",
+ "saveforge-store",
+ "semver",
  "serde_json",
+ "sha2 0.11.1",
  "tempfile",
  "time",
  "tokio",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "zip",
 ]
 
 [[package]]

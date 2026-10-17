@@ -13,6 +13,9 @@ use saveforge_app::{App, Message, Screen};
 use saveforge_core::paths::AppPaths;
 use saveforge_core::settings::AppSettings;
 use saveforge_host::{HOST_VERSION, WASMTIME_VERSION};
+use saveforge_store::cache::{CatalogLoad, CatalogSource};
+use saveforge_store::{Catalog, Update};
+use semver::Version;
 
 fn settings(world: &World) -> AppSettings {
     let mut s = AppSettings::defaults(&AppPaths::under(world.dir.path().join("data")));
@@ -100,6 +103,30 @@ fn about_shows_versions_and_links() {
 fn info_bar_can_be_dismissed() {
     let world = World::new();
     let mut app = ready_app(&world);
+    let _ = app.update(Message::DismissInfo);
+    assert_eq!(app.info(), None);
+
+    let catalog = Catalog::parse(r#"{"schemaVersion":"1","plugins":[]}"#).unwrap();
+    let load = CatalogLoad {
+        catalog,
+        source: CatalogSource::Online,
+    };
+    let update = Update {
+        id: "test-plugin".to_owned(),
+        name: "Test Plugin".to_owned(),
+        installed: Version::new(0, 1, 0),
+        latest: Version::new(0, 2, 0),
+    };
+    let _ = app.update(Message::UpdatesChecked {
+        result: Ok((load, vec![update])),
+    });
+    assert_ne!(app.info(), None);
+    {
+        let mut ui = simulator(app.view());
+        let _ = ui.click("Dismiss");
+        let messages: Vec<Message> = ui.into_messages().collect();
+        assert!(messages.iter().any(|m| matches!(m, Message::DismissInfo)));
+    }
     let _ = app.update(Message::DismissInfo);
     assert_eq!(app.info(), None);
 }

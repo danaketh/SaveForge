@@ -8,6 +8,7 @@ pub mod home;
 pub mod logging;
 pub mod render;
 pub mod settings_form;
+pub mod store;
 pub mod theme;
 pub mod ui_state;
 
