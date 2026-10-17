@@ -1,0 +1,29 @@
+//! Native tests of the {{name}} plugin.
+
+use saveforge_sdk::ui::Widget;
+use saveforge_sdk::{Document, Plugin};
+use {{crate_name}}::{PRIORITY, {{type_name}}};
+
+#[test]
+fn detects_json_objects() {
+    assert_eq!(
+        {{type_name}}::detect("save{{extension}}", br#"{"name":"Ada"}"#),
+        Some(PRIORITY)
+    );
+    assert_eq!({{type_name}}::detect("save{{extension}}", b"PK\x03\x04"), None);
+}
+
+#[test]
+fn opens_a_minimal_save() {
+    let doc = {{type_name}}::open("save{{extension}}", br#"{"name":"Ada"}"#.to_vec(), vec![]).unwrap();
+    let labels: Vec<String> = doc
+        .view()
+        .nodes
+        .iter()
+        .filter_map(|node| match &node.widget {
+            Widget::Field(field) => Some(field.label.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(labels, ["Name"]);
+}

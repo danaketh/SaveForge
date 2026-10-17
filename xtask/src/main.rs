@@ -5,6 +5,7 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 use saveforge_core::settings::file_url;
 use xtask::package::{build_package, catalog_json};
+use xtask::scaffold::{NewPlugin, scaffold};
 use xtask::{
     PluginCrate, WASM_TARGET, find_plugin_crates, install, select_plugins, target_dir,
     wasm_artifact, workspace_root,
@@ -12,13 +13,15 @@ use xtask::{
 
 const USAGE: &str = "usage:
   cargo xtask plugins [-p <package-or-plugin-id>]
-  cargo xtask package [-p <package-or-plugin-id>] [--base-url <url>]";
+  cargo xtask package [-p <package-or-plugin-id>] [--base-url <url>]
+  cargo xtask new-plugin <id> [--name <display name>] [--ext <.ext>] [--author <name>]";
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("plugins") => plugins(&args[1..]),
         Some("package") => package(&args[1..]),
+        Some("new-plugin") => new_plugin(&args[1..]),
         _ => bail!(USAGE),
     }
 }
@@ -102,5 +105,45 @@ fn package(args: &[String]) -> Result<()> {
         .with_context(|| format!("cannot write {}", catalog_path.display()))?;
     println!("catalog: {}", catalog_path.display());
     print!("{catalog}");
+    Ok(())
+}
+
+fn new_plugin(args: &[String]) -> Result<()> {
+    let [id, flags @ ..] = args else {
+        bail!(USAGE);
+    };
+    let mut plugin = NewPlugin::new(id)?;
+    let mut rest = flags;
+    while let [flag, value, tail @ ..] = rest {
+        if value.contains(['"', '\\']) {
+            bail!("{flag} must not contain quotes or backslashes");
+        }
+        match flag.as_str() {
+            "--name" => plugin.name.clone_from(value),
+            "--ext" if value.starts_with('.') => plugin.extension.clone_from(value),
+            "--ext" => plugin.extension = format!(".{value}"),
+            "--author" => plugin.author.clone_from(value),
+            _ => bail!(USAGE),
+        }
+        rest = tail;
+    }
+    if !rest.is_empty() {
+        bail!(USAGE);
+    }
+    let (root, _) = roots();
+    scaffold(&root, &plugin)?;
+    println!("created plugins/{id}");
+    // Generated lines vary in length with the names, so let rustfmt lay
+    // them out.
+    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
+    let formatted = Command::new(cargo)
+        .current_dir(&root)
+        .args(["fmt", "-p", id])
+        .status()
+        .is_ok_and(|s| s.success());
+    if !formatted {
+        eprintln!("warning: cargo fmt -p {id} failed; run it before committing");
+    }
+    println!("next: cargo test -p {id} && cargo xtask plugins -p {id}");
     Ok(())
 }

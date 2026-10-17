@@ -6758,7 +6758,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "saveforge-core",
+ "saveforge-plugin-api",
  "saveforge-store",
+ "semver",
  "serde_json",
  "sha2 0.11.1",
  "tempfile",

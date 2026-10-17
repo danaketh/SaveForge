@@ -8,6 +8,7 @@ use anyhow::{Context, bail, ensure};
 use saveforge_core::manifest::PluginManifest;
 
 pub mod package;
+pub mod scaffold;
 
 pub const WASM_TARGET: &str = "wasm32-wasip2";
 

@@ -14,7 +14,9 @@ tempfile.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
+saveforge-plugin-api.workspace = true
 saveforge-store.workspace = true
+semver.workspace = true
 
 [lints]
 workspace = true
