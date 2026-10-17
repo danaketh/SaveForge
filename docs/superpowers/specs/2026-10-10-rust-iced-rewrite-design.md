@@ -73,7 +73,7 @@ saveforge-sdk    → (WIT file shared with plugin-api; no host crates)
 
 ### 3.3 Key crates
 
-`iced`, `wasmtime` (component model, Cranelift), `wasmtime-wasi`, `wit-bindgen` (guest), `serde`, `serde_json` (`preserve_order`, `arbitrary_precision` where noted), `reqwest` (rustls), `tokio` (iced executor), `sha2`, `zip`, `semver`, `directories`, `rfd`, `tracing`, `tracing-subscriber`, `tracing-appender`, `thiserror`, `anyhow` (xtask only), `tempfile` (tests).
+`iced`, `wasmtime` (component model, Cranelift), `wasmtime-wasi`, `wit-bindgen` (guest), `serde`, `serde_json` (`preserve_order`, `arbitrary_precision` where noted), `ureq` (rustls on ring, OS trust store via `rustls-platform-verifier`), `tokio` (iced executor), `sha2`, `zip`, `semver`, `directories`, `rfd`, `tracing`, `tracing-subscriber`, `tracing-appender`, `thiserror`, `anyhow` (xtask only), `tempfile` (store staging, tests).
 
 Exact versions are pinned in the implementation plan.
 
@@ -310,6 +310,7 @@ world plugin {
 ```
 
 - `Screen` enum: `Home | Editor | Store | PluginDetail(PluginId) | Settings | About`.
+- `Editor` is `Home` with an open document; visiting Store, Settings or About keeps the document open.
 - The rail has plugin icons on top. Each shows the manifest icon or, if there is none, the first letter of the name. Store, Settings, and About sit at the bottom. The selected plugin gets an amber indicator bar. Failed plugins are greyed out with the load error in a tooltip.
 - Window: native decorations, 1200×750 default, 900×600 minimum, centered.
 - The theme is a custom iced `Theme` with the palette ported from `Themes/Colors.axaml` and `DarkTheme.axaml`.
@@ -337,7 +338,7 @@ world plugin {
 1. Read the file. Call `detect` on every loaded plugin whose extensions match.
 2. The highest priority wins. On a tie, a modal asks the user to pick a plugin. If nothing matches, the status bar shows "No plugin can open <file>".
 3. Resolve aux files and call `open` off-thread. While it runs, show a loading spinner in the main pane.
-4. On success, go to `Screen::Editor` with the live instance. On `Err`, show the error in the status bar and stay on Home.
+4. On success, show the editor (on `Home`) with the live instance. On `Err`, show the error in the status bar and stay on Home.
 5. Only one document is open at a time. Opening another while the current one is dirty triggers the unsaved-changes guard.
 
 **Edit**
