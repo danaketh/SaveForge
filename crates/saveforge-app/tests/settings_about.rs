@@ -8,6 +8,7 @@ use std::path::Path;
 use common::World;
 use iced_test::simulator;
 use saveforge_app::documents::{DetectOutcome, detect_file, open_document};
+use saveforge_app::settings_form::{SettingsField, SettingsForm};
 use saveforge_app::{App, Message, Screen};
 use saveforge_core::paths::AppPaths;
 use saveforge_core::settings::AppSettings;
@@ -133,4 +134,128 @@ fn save_panel_is_only_on_home() {
     let _ = app.update(Message::Navigate(Screen::Settings));
     let mut ui = simulator(app.view());
     assert!(ui.find("Test Plugin").is_err());
+}
+
+fn edit(app: &mut App, field: SettingsField, value: &str) {
+    let _ = app.update(Message::SettingsEdited(field, value.to_owned()));
+}
+
+fn saved_settings(world: &World) -> AppSettings {
+    let defaults = settings(world);
+    AppSettings::load(&world.services.paths.settings_file(), defaults).settings
+}
+
+#[test]
+fn settings_form_validates_fields() {
+    let world = World::new();
+    let mut form = SettingsForm::from_settings(&settings(&world));
+    assert_eq!(form.validate(), Vec::<String>::new());
+    form.catalog_url = "ftp://x".to_owned();
+    form.backup_directory = "  ".to_owned();
+    assert_eq!(
+        form.validate(),
+        [
+            "Catalog URL must start with https:// or file://",
+            "Backup directory must not be empty.",
+        ]
+    );
+    form.plugin_directory = String::new();
+    assert_eq!(form.validate()[1], "Plugin directory must not be empty.");
+}
+
+#[test]
+fn saving_settings_keeps_save_directories() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    let _ = app.update(Message::Navigate(Screen::Settings));
+    let backups = world.dir.path().join("elsewhere");
+    edit(
+        &mut app,
+        SettingsField::BackupDirectory,
+        &backups.display().to_string(),
+    );
+    let _ = app.update(Message::SettingsToggled(true));
+    let _ = app.update(Message::SaveSettings);
+
+    assert_eq!(app.status(), Some("Settings saved."));
+    let on_disk = saved_settings(&world);
+    assert_eq!(on_disk.backup_directory, backups);
+    assert!(on_disk.check_updates_on_startup);
+    assert_eq!(
+        on_disk.plugin_save_directories.get("test-plugin"),
+        Some(&world.dir.path().join("saves").display().to_string())
+    );
+    assert_eq!(app.settings().backup_directory, backups);
+}
+
+#[test]
+fn changing_plugin_directory_says_restart() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    let _ = app.update(Message::Navigate(Screen::Settings));
+    let other = world.dir.path().join("other-plugins");
+    edit(
+        &mut app,
+        SettingsField::PluginDirectory,
+        &other.display().to_string(),
+    );
+    let _ = app.update(Message::SaveSettings);
+    assert_eq!(
+        app.status(),
+        Some("Settings saved. Plugin directory changes take effect after restart.")
+    );
+    assert_eq!(app.settings().plugin_directory, other);
+    assert!(app.registry().unwrap().get("test-plugin").is_some());
+}
+
+#[test]
+fn invalid_settings_are_not_saved() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    let _ = app.update(Message::Navigate(Screen::Settings));
+    let _ = app.update(Message::SaveSettings);
+    let before = fs::read_to_string(world.services.paths.settings_file()).unwrap();
+
+    edit(
+        &mut app,
+        SettingsField::CatalogUrl,
+        "http://example.com/c.json",
+    );
+    edit(&mut app, SettingsField::BackupDirectory, "/somewhere/else");
+    let _ = app.update(Message::SaveSettings);
+    assert_eq!(
+        fs::read_to_string(world.services.paths.settings_file()).unwrap(),
+        before
+    );
+    assert_ne!(app.settings_form().errors.len(), 0);
+    assert_ne!(app.settings().catalog_url, "http://example.com/c.json");
+    let mut ui = simulator(app.view());
+    assert!(
+        ui.find("Catalog URL must start with https:// or file://")
+            .is_ok()
+    );
+}
+
+#[test]
+fn unwritable_settings_keep_changes_in_memory() {
+    let mut world = World::new();
+    let blocker = world.dir.path().join("blocked");
+    fs::write(&blocker, b"not a dir").unwrap();
+    world.services.paths = AppPaths::under(blocker);
+    let mut app = ready_app(&world);
+    let _ = app.update(Message::Navigate(Screen::Settings));
+    let backups = world.dir.path().join("elsewhere");
+    edit(
+        &mut app,
+        SettingsField::BackupDirectory,
+        &backups.display().to_string(),
+    );
+    let _ = app.update(Message::SaveSettings);
+    assert!(
+        app.status()
+            .is_some_and(|s| s.starts_with("Could not save settings")),
+        "{:?}",
+        app.status()
+    );
+    assert_eq!(app.settings().backup_directory, backups);
 }

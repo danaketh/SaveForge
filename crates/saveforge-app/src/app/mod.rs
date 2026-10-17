@@ -23,6 +23,7 @@ use crate::editor::{Editor, EditorEffect};
 use crate::format::window_title;
 use crate::home::{Home, Saves, raw_save_dir, resolve_save_dir};
 use crate::render::UiMessage;
+use crate::settings_form::{SettingsField, SettingsForm};
 
 /// Source repository, linked from About. Placeholder until the project is
 /// published, like `RELEASE_CATALOG_URL`.
@@ -119,6 +120,12 @@ pub enum Message {
     Navigate(Screen),
     DismissInfo,
     OpenUrl(String),
+    SettingsEdited(SettingsField, String),
+    SettingsToggled(bool),
+    BrowseSettingsDir(SettingsField),
+    SettingsDirBrowsed(SettingsField, Option<PathBuf>),
+    SaveSettings,
+    CheckUpdatesNow,
 }
 
 #[derive(Debug)]
@@ -126,6 +133,7 @@ pub struct App {
     services: Option<Services>,
     fatal: Option<String>,
     settings: AppSettings,
+    settings_form: SettingsForm,
     plugins: Plugins,
     screen: Screen,
     home: Home,
@@ -155,6 +163,7 @@ impl App {
         let app = Self {
             services: Some(services),
             fatal: None,
+            settings_form: SettingsForm::from_settings(&settings),
             settings,
             plugins: Plugins::Loading,
             screen: Screen::Home,
@@ -180,6 +189,7 @@ impl App {
         Self {
             services: None,
             fatal: Some(reason),
+            settings_form: SettingsForm::from_settings(&settings),
             settings,
             plugins: Plugins::Ready(PluginRegistry::default()),
             screen: Screen::Home,
@@ -237,6 +247,10 @@ impl App {
 
     pub fn settings(&self) -> &AppSettings {
         &self.settings
+    }
+
+    pub fn settings_form(&self) -> &SettingsForm {
+        &self.settings_form
     }
 
     pub fn registry(&self) -> Option<&PluginRegistry> {
@@ -306,7 +320,7 @@ impl App {
                 self.home.editing = Some(path.display().to_string());
                 Task::none()
             }
-            Message::PathBrowsed(None) => Task::none(),
+            Message::PathBrowsed(None) | Message::SettingsDirBrowsed(_, None) => Task::none(),
             Message::ConfirmPath => self.confirm_path(),
             Message::CancelPath => {
                 self.home.editing = None;
@@ -392,7 +406,39 @@ impl App {
             }
             Message::CloseRequested(id) => self.guarded(Pending::Exit(id)),
             Message::Navigate(screen) => {
+                if screen == Screen::Settings {
+                    self.settings_form = SettingsForm::from_settings(&self.settings);
+                }
                 self.screen = screen;
+                Task::none()
+            }
+            Message::SettingsEdited(field, value) => {
+                *self.settings_form.field_mut(field) = value;
+                Task::none()
+            }
+            Message::SettingsToggled(on) => {
+                self.settings_form.check_updates_on_startup = on;
+                Task::none()
+            }
+            Message::BrowseSettingsDir(field) => Task::perform(
+                async {
+                    rfd::AsyncFileDialog::new()
+                        .pick_folder()
+                        .await
+                        .map(|handle| handle.path().to_path_buf())
+                },
+                move |path| Message::SettingsDirBrowsed(field, path),
+            ),
+            Message::SettingsDirBrowsed(field, Some(path)) => {
+                *self.settings_form.field_mut(field) = path.display().to_string();
+                Task::none()
+            }
+            Message::SaveSettings => {
+                self.save_settings();
+                Task::none()
+            }
+            Message::CheckUpdatesNow => {
+                self.status = Some("Checking for plugin updates…".to_owned());
                 Task::none()
             }
             Message::DismissInfo => {
@@ -505,6 +551,29 @@ impl App {
         }
         self.home.raw_dir = Some(raw);
         self.scan_saves()
+    }
+
+    /// Validates the Settings form, then applies and writes it. A write
+    /// failure keeps the new values for this session.
+    fn save_settings(&mut self) {
+        self.settings_form.errors = self.settings_form.validate();
+        if !self.settings_form.errors.is_empty() {
+            return;
+        }
+        let plugin_dir_changed = self.settings_form.apply(&mut self.settings);
+        let Some(services) = &self.services else {
+            return;
+        };
+        self.status = Some(match self.settings.save(&services.paths.settings_file()) {
+            Ok(()) if plugin_dir_changed => {
+                "Settings saved. Plugin directory changes take effect after restart.".to_owned()
+            }
+            Ok(()) => "Settings saved.".to_owned(),
+            Err(e) => {
+                tracing::warn!(error = %e, "could not save settings");
+                format!("Could not save settings ({e}); changes kept for this session.")
+            }
+        });
     }
 
     fn start_detect(&mut self, path: PathBuf) -> Task<Message> {

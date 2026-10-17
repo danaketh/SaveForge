@@ -260,9 +260,10 @@ impl App {
         } else {
             match &self.screen {
                 Screen::Home => self.home_pane(),
-                Screen::Store | Screen::PluginDetail(_) | Screen::Settings => {
+                Screen::Store | Screen::PluginDetail(_) => {
                     center(text("Loading…").style(theme::muted)).into()
                 }
+                Screen::Settings => self.settings_view(),
                 Screen::About => settings_view::about(),
             }
         };
