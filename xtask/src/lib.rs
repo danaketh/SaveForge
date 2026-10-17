@@ -4,8 +4,10 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, ensure};
+use anyhow::{Context, bail, ensure};
 use saveforge_core::manifest::PluginManifest;
+
+pub mod package;
 
 pub const WASM_TARGET: &str = "wasm32-wasip2";
 
@@ -66,6 +68,38 @@ pub fn find_plugin_crates(workspace: &Path) -> Vec<PluginCrate> {
     }
     found.sort_by(|a, b| a.package.cmp(&b.package));
     found
+}
+
+/// The crates `filter` names (by package name or plugin id), or all of them.
+/// With `shippable_only`, test fixtures are left out, and naming one is an
+/// error.
+pub fn select_plugins(
+    crates: Vec<PluginCrate>,
+    filter: Option<&str>,
+    shippable_only: bool,
+) -> anyhow::Result<Vec<PluginCrate>> {
+    let selected: Vec<PluginCrate> = crates
+        .into_iter()
+        .filter(|c| {
+            filter.is_none_or(|f| {
+                c.package == f || PluginManifest::load(&c.dir).is_ok_and(|m| m.id == f)
+            })
+        })
+        .collect();
+    if let (Some(name), true) = (filter, shippable_only)
+        && selected.iter().any(|c| c.kind == PluginKind::Fixture)
+    {
+        bail!("{name} is a test fixture, not a plugin");
+    }
+    let selected: Vec<PluginCrate> = selected
+        .into_iter()
+        .filter(|c| !shippable_only || c.kind == PluginKind::Plugin)
+        .collect();
+    match (selected.is_empty(), filter) {
+        (true, Some(name)) => bail!("no plugin crate matched {name}"),
+        (true, None) => bail!("no plugin crate found"),
+        (false, _) => Ok(selected),
+    }
 }
 
 /// The component cargo writes for `package` on the wasm target.

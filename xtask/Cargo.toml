@@ -8,9 +8,13 @@ publish.workspace = true
 [dependencies]
 anyhow.workspace = true
 saveforge-core.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
-tempfile.workspace = true
+saveforge-store.workspace = true
 
 [lints]
 workspace = true
