@@ -31,6 +31,10 @@ cargo build --release -p saveforge-app
 
 The binary is `target/release/saveforge` (`saveforge.exe` on Windows).
 
+### Downloading a release
+
+Each GitHub release has the app for Windows (`saveforge-windows-x64.exe`), Linux (`saveforge-linux-x64.tar.gz`) and macOS (`saveforge-macos-arm64.tar.gz`). Unpack the `.tar.gz` with `tar -xzf` and run `./saveforge`. The macOS binary is not signed. On first launch, right-click it and choose Open, or clear the quarantine flag with `xattr -d com.apple.quarantine saveforge`.
+
 ## Tests
 
 ```bash
@@ -73,7 +77,7 @@ CI runs:
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo clippy -p saveforge-sdk -p test-plugin -p sample-stardew -p planet-crafter --target wasm32-wasip2 -- -D warnings
+# plus the wasm clippy line in .github/workflows/ci.yml (it lists every plugin)
 cargo xtask plugins
 cargo test --workspace
 cargo deny check

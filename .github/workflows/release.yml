@@ -24,15 +24,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Unix binaries ship as tar.gz: artifacts drop the executable bit.
           - os: windows-latest
             binary: target/release/saveforge.exe
             asset: saveforge-windows-x64.exe
+            pack: copy
           - os: ubuntu-latest
             binary: target/release/saveforge
-            asset: saveforge-linux-x64
+            asset: saveforge-linux-x64.tar.gz
+            pack: tar
           - os: macos-latest
             binary: target/release/saveforge
-            asset: saveforge-macos-arm64
+            asset: saveforge-macos-arm64.tar.gz
+            pack: tar
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +48,11 @@ jobs:
       - shell: bash
         run: |
           mkdir -p dist
-          cp "${{ matrix.binary }}" "dist/${{ matrix.asset }}"
+          if [ "${{ matrix.pack }}" = tar ]; then
+            tar -czf "dist/${{ matrix.asset }}" -C target/release saveforge
+          else
+            cp "${{ matrix.binary }}" "dist/${{ matrix.asset }}"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
@@ -55,6 +63,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Refuse placeholder URLs
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          if grep -qE 'https://[^"]*YOUR_ORG/YOUR_REPO' crates/saveforge-core/src/settings.rs crates/saveforge-app/src/app/mod.rs; then
+            echo "::error::Replace YOUR_ORG/YOUR_REPO in RELEASE_CATALOG_URL and REPOSITORY_URL before releasing"
+            exit 1
+          fi
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable

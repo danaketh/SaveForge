@@ -7,7 +7,7 @@ use saveforge_core::settings::file_url;
 use saveforge_store::Catalog;
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
-use xtask::package::{Package, build_package, catalog_json};
+use xtask::package::{Package, build_package, catalog_json, write_packages};
 use xtask::{find_plugin_crates, select_plugins};
 
 const MANIFEST: &str = r#"{
@@ -190,5 +190,42 @@ fn package_refuses_fixtures_and_unknown_ids() {
     assert_eq!(
         names(select_plugins(crates(), None, false).unwrap()),
         ["demo", "test-plugin"]
+    );
+}
+
+#[test]
+fn failed_packaging_keeps_the_previous_output() {
+    let fixture = Fixture::new(MANIFEST);
+    let out = fixture.tmp.path().join("packages");
+    fs::create_dir_all(&out).unwrap();
+    fs::write(out.join("marker.txt"), b"previous").unwrap();
+    let plugins = [
+        (fixture.krate(), fixture.tmp.path().join("plugin.wasm")),
+        (fixture.krate(), fixture.tmp.path().join("missing.wasm")),
+    ];
+    write_packages(&out, &plugins, None).unwrap_err();
+    assert_eq!(fs::read(out.join("marker.txt")).unwrap(), b"previous");
+    assert!(!fixture.tmp.path().join("packages.tmp").exists());
+}
+
+#[test]
+fn write_packages_replaces_the_output() {
+    let fixture = Fixture::new(MANIFEST);
+    let out = fixture.tmp.path().join("packages");
+    fs::create_dir_all(&out).unwrap();
+    fs::write(out.join("marker.txt"), b"previous").unwrap();
+    let plugins = [(fixture.krate(), fixture.tmp.path().join("plugin.wasm"))];
+    let (packages, catalog) = write_packages(&out, &plugins, None).unwrap();
+    assert_eq!(packages.len(), 1);
+    assert!(out.join("demo-1.2.3.zip").is_file());
+    assert_eq!(
+        fs::read_to_string(out.join("catalog.json")).unwrap(),
+        catalog
+    );
+    assert!(!out.join("marker.txt").exists());
+    let value: serde_json::Value = serde_json::from_str(&catalog).unwrap();
+    assert_eq!(
+        value["plugins"][0]["packageUrl"],
+        format!("{}/demo-1.2.3.zip", file_url(&out))
     );
 }

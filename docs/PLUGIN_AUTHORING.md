@@ -269,4 +269,4 @@ Plugins are ordinary crates, so `cargo test -p my-game` runs natively without th
 cargo xtask package -p my-game --base-url https://example.com/releases/
 ```
 
-This writes `target/packages/my-game-0.1.0.zip` (`manifest.json`, the component and the icon) and a `catalog.json` entry with its SHA-256. Without `--base-url`, the entry points at the local zip, so you can try the install in the app's Store first: set the catalog URL in Settings to `target/packages/catalog.json` as a `file://` URL. Publish the zip, add the entry to your catalog, and see [CATALOG_SCHEMA.md](CATALOG_SCHEMA.md) for the format.
+This writes `target/packages/my-game-0.1.0.zip` (`manifest.json`, the component, and the icon if the manifest names one) and a `catalog.json` entry with its SHA-256. Without `--base-url`, the entry points at the local zip, so you can try the install in the app's Store first: set the catalog URL in Settings to `target/packages/catalog.json` as a `file://` URL. Publish the zip, add the entry to your catalog, and see [CATALOG_SCHEMA.md](CATALOG_SCHEMA.md) for the format.

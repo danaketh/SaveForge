@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, bail};
 use saveforge_core::manifest::{MANIFEST_FILE_NAME, PluginManifest};
+use saveforge_core::settings::file_url;
 use sha2::{Digest, Sha256};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, DateTime, ZipWriter};
@@ -104,6 +105,54 @@ pub fn catalog_json(packages: &[Package], base_url: &str) -> anyhow::Result<Stri
         .collect();
     let catalog = serde_json::json!({ "schemaVersion": "1.0", "plugins": plugins });
     Ok(serde_json::to_string_pretty(&catalog)? + "\n")
+}
+
+/// Packages every `(crate_dir, wasm)` pair and writes `catalog.json` into
+/// `out`. Everything is built in `{out}.tmp` first and only replaces `out`
+/// when it all succeeded, so a failure keeps the previous output. Without
+/// `base_url`, package URLs point at `out` itself (`file://`).
+pub fn write_packages(
+    out: &Path,
+    plugins: &[(PathBuf, PathBuf)],
+    base_url: Option<&str>,
+) -> anyhow::Result<(Vec<Package>, String)> {
+    let mut staging = out.as_os_str().to_owned();
+    staging.push(".tmp");
+    let staging = PathBuf::from(staging);
+    let result = build_all(&staging, out, plugins, base_url);
+    if result.is_err() {
+        let _ = fs::remove_dir_all(&staging);
+        return result;
+    }
+    if out.exists() {
+        fs::remove_dir_all(out).with_context(|| format!("cannot clear {}", out.display()))?;
+    }
+    fs::rename(&staging, out)
+        .with_context(|| format!("cannot move {} to {}", staging.display(), out.display()))?;
+    result
+}
+
+fn build_all(
+    staging: &Path,
+    out: &Path,
+    plugins: &[(PathBuf, PathBuf)],
+    base_url: Option<&str>,
+) -> anyhow::Result<(Vec<Package>, String)> {
+    if staging.exists() {
+        fs::remove_dir_all(staging)
+            .with_context(|| format!("cannot clear {}", staging.display()))?;
+    }
+    let mut packages = Vec::new();
+    for (crate_dir, wasm) in plugins {
+        let mut package = build_package(crate_dir, wasm, staging)?;
+        package.path = out.join(package_file_name(&package.manifest));
+        packages.push(package);
+    }
+    let default_base = format!("{}/", file_url(out));
+    let catalog = catalog_json(&packages, base_url.unwrap_or(&default_base))?;
+    fs::write(staging.join("catalog.json"), &catalog)
+        .with_context(|| format!("cannot write {}", staging.display()))?;
+    Ok((packages, catalog))
 }
 
 fn hex(bytes: &[u8]) -> String {

@@ -37,3 +37,24 @@ fn only_tag_pushes_publish() {
         "publish must be limited to tag pushes"
     );
 }
+
+#[test]
+fn unix_binaries_ship_as_tarballs() {
+    for needle in [
+        "saveforge-linux-x64.tar.gz",
+        "saveforge-macos-arm64.tar.gz",
+        "tar -czf",
+    ] {
+        assert!(RELEASE.contains(needle), "missing {needle}");
+    }
+}
+
+#[test]
+fn releases_refuse_placeholder_urls() {
+    assert!(RELEASE.contains(
+        "::error::Replace YOUR_ORG/YOUR_REPO in RELEASE_CATALOG_URL and REPOSITORY_URL before releasing"
+    ));
+    assert!(RELEASE.contains("crates/saveforge-core/src/settings.rs"));
+    assert!(RELEASE.contains("crates/saveforge-app/src/app/mod.rs"));
+    assert!(RELEASE.contains("exit 1"));
+}

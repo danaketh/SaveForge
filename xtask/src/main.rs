@@ -1,10 +1,8 @@
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use saveforge_core::settings::file_url;
-use xtask::package::{build_package, catalog_json};
+use xtask::package::write_packages;
 use xtask::scaffold::{NewPlugin, scaffold};
 use xtask::{
     PluginCrate, WASM_TARGET, find_plugin_crates, install, select_plugins, target_dir,
@@ -89,21 +87,15 @@ fn package(args: &[String]) -> Result<()> {
     build_wasm(&root, &crates)?;
 
     let out = target_dir.join("packages");
-    if out.exists() {
-        fs::remove_dir_all(&out).with_context(|| format!("cannot clear {}", out.display()))?;
-    }
-    let mut packages = Vec::new();
-    for c in &crates {
-        let package = build_package(&c.dir, &wasm_artifact(&target_dir, &c.package), &out)?;
+    let plugins: Vec<_> = crates
+        .iter()
+        .map(|c| (c.dir.clone(), wasm_artifact(&target_dir, &c.package)))
+        .collect();
+    let (packages, catalog) = write_packages(&out, &plugins, base_url)?;
+    for package in &packages {
         println!("{}  sha256:{}", package.path.display(), package.sha256);
-        packages.push(package);
     }
-    let default_base = format!("{}/", file_url(&out));
-    let catalog = catalog_json(&packages, base_url.unwrap_or(&default_base))?;
-    let catalog_path = out.join("catalog.json");
-    fs::write(&catalog_path, &catalog)
-        .with_context(|| format!("cannot write {}", catalog_path.display()))?;
-    println!("catalog: {}", catalog_path.display());
+    println!("catalog: {}", out.join("catalog.json").display());
     print!("{catalog}");
     Ok(())
 }
