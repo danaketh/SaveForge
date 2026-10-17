@@ -115,9 +115,6 @@ fn new_plugin(args: &[String]) -> Result<()> {
     let mut plugin = NewPlugin::new(id)?;
     let mut rest = flags;
     while let [flag, value, tail @ ..] = rest {
-        if value.contains(['"', '\\']) {
-            bail!("{flag} must not contain quotes or backslashes");
-        }
         match flag.as_str() {
             "--name" => plugin.name.clone_from(value),
             "--ext" if value.starts_with('.') => plugin.extension.clone_from(value),

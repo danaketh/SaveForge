@@ -1,7 +1,6 @@
 //! Native tests of this plugin.
 
-use saveforge_sdk::ui::Widget;
-use saveforge_sdk::{Document, Plugin};
+use saveforge_sdk::{Document as _, Plugin as _};
 use {{crate_name}}::{PRIORITY, {{type_name}}};
 
 #[test]
@@ -21,7 +20,7 @@ fn opens_a_minimal_save() {
         .nodes
         .iter()
         .filter_map(|node| match &node.widget {
-            Widget::Field(field) => Some(field.label.clone()),
+            saveforge_sdk::ui::Widget::Field(field) => Some(field.label.clone()),
             _ => None,
         })
         .collect();

@@ -173,3 +173,78 @@ fn display_name_stays_out_of_doc_comments() {
         }
     }
 }
+
+fn assert_untouched(root: &Path) {
+    assert_eq!(
+        fs::read_to_string(root.join("Cargo.toml")).unwrap(),
+        WORKSPACE
+    );
+    assert_eq!(
+        fs::read_to_string(root.join(".github/workflows/ci.yml")).unwrap(),
+        CI
+    );
+}
+
+#[test]
+fn ids_that_clash_are_rejected() {
+    for id in ["async", "gen", "std", "self"] {
+        assert_eq!(
+            NewPlugin::new(id).unwrap_err().to_string(),
+            format!("'{id}' is a reserved word in Rust")
+        );
+    }
+    let root = workspace();
+    fs::create_dir_all(root.path().join("fixtures/test-plugin")).unwrap();
+    for (id, used_by) in [
+        ("xtask", "xtask"),
+        ("b", "plugins/b"),
+        ("test-plugin", "fixtures/test-plugin"),
+    ] {
+        let err = scaffold(root.path(), &NewPlugin::new(id).unwrap()).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            format!("'{id}' is already used by {used_by}")
+        );
+    }
+    assert_untouched(root.path());
+}
+
+#[test]
+fn bad_names_and_extensions_are_rejected() {
+    let root = workspace();
+    let cases: [(&str, &str, &str); 7] = [
+        ("", ".json", "Me"),
+        ("A\nB", ".json", "Me"),
+        ("Name", ".json", ""),
+        ("Name", "", "Me"),
+        ("Name", ".", "Me"),
+        ("Name", "a b", "Me"),
+        ("Name", ".s v", "Me"),
+    ];
+    for (name, extension, author) in cases {
+        let mut plugin = NewPlugin::new("my-game").unwrap();
+        plugin.name = name.to_owned();
+        plugin.extension = extension.to_owned();
+        plugin.author = author.to_owned();
+        assert!(
+            scaffold(root.path(), &plugin).is_err(),
+            "{name:?} {extension:?} {author:?}"
+        );
+        assert!(!root.path().join("plugins/my-game").exists());
+    }
+    assert_untouched(root.path());
+}
+
+#[test]
+fn scaffold_is_all_or_nothing() {
+    let root = workspace();
+    fs::write(root.path().join("plugins"), b"not a directory").unwrap();
+    scaffold(root.path(), &NewPlugin::new("my-game").unwrap()).unwrap_err();
+    assert_untouched(root.path());
+    let leftovers: Vec<_> = fs::read_dir(root.path())
+        .unwrap()
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().starts_with(".new-"))
+        .collect();
+    assert_eq!(leftovers.len(), 0);
+}

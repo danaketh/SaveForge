@@ -1,18 +1,19 @@
 //! A `SaveForge` plugin built on the schema-driven form helper.
 //! See `docs/PLUGIN_AUTHORING.md` for the full guide.
 
-use saveforge_sdk::form::{FormDocument, FormPage, FormSchema, FormSection, JsonCodec, text};
-use saveforge_sdk::{AuxFile, Plugin, export_plugin};
+// SDK items are written with their full path, so this crate's own type
+// names can never clash with them.
+use saveforge_sdk::form;
 
 #[derive(Debug)]
 pub struct {{type_name}};
 
-pub type {{type_name}}Document = FormDocument<JsonCodec>;
+pub type {{type_name}}Document = form::FormDocument<form::JsonCodec>;
 
 /// Detection priority. When several plugins claim a file, the highest wins.
 pub const PRIORITY: u32 = 1;
 
-impl Plugin for {{type_name}} {
+impl saveforge_sdk::Plugin for {{type_name}} {
     type Doc = {{type_name}}Document;
 
     /// Claims any JSON object. Replace this with a check for a key that only
@@ -29,7 +30,7 @@ impl Plugin for {{type_name}} {
     fn open(
         _file_name: &str,
         bytes: Vec<u8>,
-        _aux: Vec<AuxFile>,
+        _aux: Vec<saveforge_sdk::AuxFile>,
     ) -> Result<{{type_name}}Document, String> {
         {{type_name}}Document::open(schema(), &bytes)
     }
@@ -37,10 +38,11 @@ impl Plugin for {{type_name}} {
 
 /// The editor: pages become tabs, and each field edits the value at its
 /// dot-path in the save.
-pub fn schema() -> FormSchema {
-    FormSchema::new().page(
-        FormPage::new("General").section(FormSection::new().field(text("name", "Name").required())),
+pub fn schema() -> form::FormSchema {
+    form::FormSchema::new().page(
+        form::FormPage::new("General")
+            .section(form::FormSection::new().field(form::text("name", "Name").required())),
     )
 }
 
-export_plugin!({{type_name}});
+saveforge_sdk::export_plugin!({{type_name}});

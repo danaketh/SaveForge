@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, bail};
-use saveforge_core::manifest::is_valid_id;
+use saveforge_core::manifest::{PluginManifest, is_valid_id};
 
 /// The plugin API version new plugins declare (`major.minor` of the host's).
 pub const API_VERSION: &str = "0.1";
@@ -14,6 +14,18 @@ const CARGO_TOML: &str = include_str!("../templates/Cargo.toml.tmpl");
 const MANIFEST: &str = include_str!("../templates/manifest.json.tmpl");
 const LIB_RS: &str = include_str!("../templates/lib.rs.tmpl");
 const TEST_RS: &str = include_str!("../templates/test.rs.tmpl");
+
+/// Words a crate name cannot be: Rust keywords (strict, reserved, and `gen`
+/// from edition 2024) and the names of the standard crates.
+#[rustfmt::skip]
+const RESERVED: &[&str] = &[
+    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum",
+    "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move",
+    "mut", "pub", "ref", "return", "self", "static", "struct", "super", "trait", "true", "type",
+    "unsafe", "use", "where", "while", "abstract", "become", "box", "do", "final", "gen",
+    "macro", "override", "priv", "try", "typeof", "unsized", "virtual", "yield", "union",
+    "std", "core", "alloc", "test", "proc_macro",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewPlugin {
@@ -36,6 +48,9 @@ impl NewPlugin {
         if !id.starts_with(|c: char| c.is_ascii_lowercase()) {
             bail!("invalid plugin id '{id}': it must start with a letter to be a crate name");
         }
+        if RESERVED.contains(&id.replace('-', "_").as_str()) {
+            bail!("'{id}' is a reserved word in Rust");
+        }
         let words: Vec<String> = id.split('-').map(capitalize).collect();
         Ok(Self {
             id: id.to_owned(),
@@ -43,6 +58,29 @@ impl NewPlugin {
             extension: ".json".to_owned(),
             author: "Unknown".to_owned(),
         })
+    }
+
+    /// Checks the display name, author and extension: they end up in the
+    /// manifest and in Rust source.
+    pub fn validate(&self) -> anyhow::Result<()> {
+        for (flag, value) in [("--name", &self.name), ("--author", &self.author)] {
+            if value.trim().is_empty() {
+                bail!("{flag} must not be empty");
+            }
+            if value.contains(['"', '\\', '\n', '\r']) {
+                bail!("{flag} must not contain quotes, backslashes or line breaks");
+            }
+        }
+        let valid_extension = self.extension.strip_prefix('.').is_some_and(|rest| {
+            !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_alphanumeric())
+        });
+        if !valid_extension {
+            bail!(
+                "--ext must be a dot and letters or digits, e.g. .sav (got '{}')",
+                self.extension
+            );
+        }
+        Ok(())
     }
 
     /// The Rust crate name: `my-game` → `my_game`.
@@ -80,6 +118,17 @@ pub fn render(template: &str, plugin: &NewPlugin) -> String {
     .fold(template.to_owned(), |text, (key, value)| {
         text.replace(key, value)
     })
+}
+
+/// The entries of the workspace's `members = [ … ]` list.
+fn workspace_members(cargo_toml: &str) -> Vec<String> {
+    cargo_toml
+        .lines()
+        .skip_while(|l| l.trim() != "members = [")
+        .skip(1)
+        .take_while(|l| !matches!(l.trim(), "]" | "],"))
+        .map(|l| l.trim().trim_end_matches(',').trim_matches('"').to_owned())
+        .collect()
 }
 
 /// Adds `member` to the multi-line `members = [ … ]` list of a workspace
@@ -137,32 +186,56 @@ pub fn add_wasm_clippy_package(ci_yml: &str, package: &str) -> Option<String> {
     Some(ci_yml.replacen(line, &updated, 1))
 }
 
-/// Creates `plugins/{id}` under `workspace` and registers it. Nothing is
-/// written when the id's folder exists or the workspace can't be updated.
+/// Creates `plugins/{id}` under `workspace` and registers it. Everything is
+/// checked and rendered first, and the crate is written to a temporary
+/// folder that is renamed into place, so an error leaves the workspace as it
+/// was.
 pub fn scaffold(workspace: &Path, plugin: &NewPlugin) -> anyhow::Result<PathBuf> {
+    plugin.validate()?;
     let id = &plugin.id;
-    let dir = workspace.join("plugins").join(id);
-    if dir.exists() {
-        bail!("plugins/{id} already exists");
-    }
     let cargo_path = workspace.join("Cargo.toml");
     let cargo = fs::read_to_string(&cargo_path)
         .with_context(|| format!("cannot read {}", cargo_path.display()))?;
+    if workspace.join("plugins").join(id).exists() {
+        bail!("plugins/{id} already exists");
+    }
+    let fixture = format!("fixtures/{id}");
+    let used_by = workspace_members(&cargo)
+        .into_iter()
+        .find(|member| member.rsplit('/').next() == Some(id.as_str()))
+        .or_else(|| workspace.join(&fixture).exists().then_some(fixture));
+    if let Some(used_by) = used_by {
+        bail!("'{id}' is already used by {used_by}");
+    }
     let cargo = add_workspace_member(&cargo, &format!("plugins/{id}"))?;
 
-    for (path, template) in [
-        ("Cargo.toml".to_owned(), CARGO_TOML),
-        ("manifest.json".to_owned(), MANIFEST),
-        ("src/lib.rs".to_owned(), LIB_RS),
-        (format!("tests/{}.rs", plugin.crate_name()), TEST_RS),
-    ] {
-        let path = dir.join(path);
+    let files = [
+        ("Cargo.toml".to_owned(), render(CARGO_TOML, plugin)),
+        ("manifest.json".to_owned(), render(MANIFEST, plugin)),
+        ("src/lib.rs".to_owned(), render(LIB_RS, plugin)),
+        (
+            format!("tests/{}.rs", plugin.crate_name()),
+            render(TEST_RS, plugin),
+        ),
+    ];
+    PluginManifest::parse(&files[1].1).context("the generated manifest is invalid")?;
+
+    let plugins = workspace.join("plugins");
+    fs::create_dir_all(&plugins).with_context(|| format!("cannot create {}", plugins.display()))?;
+    let staged = tempfile::Builder::new()
+        .prefix(".new-")
+        .tempdir_in(&plugins)
+        .with_context(|| format!("cannot write in {}", plugins.display()))?;
+    for (path, text) in &files {
+        let path = staged.path().join(path);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(&path, render(template, plugin))
-            .with_context(|| format!("cannot write {}", path.display()))?;
+        fs::write(&path, text).with_context(|| format!("cannot write {}", path.display()))?;
     }
+    let dir = plugins.join(id);
+    fs::rename(staged.path(), &dir).with_context(|| format!("cannot create {}", dir.display()))?;
+    let _ = staged.keep();
     fs::write(&cargo_path, cargo)
         .with_context(|| format!("cannot write {}", cargo_path.display()))?;
 
