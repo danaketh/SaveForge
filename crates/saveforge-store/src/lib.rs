@@ -5,6 +5,7 @@
 pub mod cache;
 mod catalog;
 mod error;
+pub mod install;
 pub mod transport;
 
 pub use catalog::{Catalog, CatalogEntry, EntryStatus, Update};

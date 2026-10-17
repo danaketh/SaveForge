@@ -39,6 +39,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 # every build (Cargo would otherwise unify it in only when Planet Crafter is
 # built alongside).
 serde_json = { version = "1.0.151", features = ["arbitrary_precision"] }
+sha2 = "0.11.1"
 tempfile = "3.27.0"
 thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["formatting", "macros"] }
@@ -61,6 +62,7 @@ wasmtime = { version = "49.0.3", default-features = false, features = [
 wasmtime-wasi = "49.0.3"
 winreg = "0.56.0"
 wit-bindgen = "0.62.0"
+zip = { version = "9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
