@@ -9,7 +9,7 @@ use iced::{Alignment, Element, Length};
 use saveforge_host::PluginEntry;
 use time::UtcOffset;
 
-use super::{App, Message, Modal, Pending, Plugins};
+use super::{App, Message, Modal, Pending, Plugins, Screen, settings_view};
 use crate::format::{format_modified, human_size};
 use crate::home::{Saves, resolve_save_dir};
 use crate::render::render;
@@ -17,10 +17,17 @@ use crate::theme;
 
 impl App {
     pub fn view(&self) -> Element<'_, Message> {
-        let page = column![
-            row![self.rail(), self.save_panel(), self.main_pane()].height(Length::Fill),
-            self.status_bar(),
-        ];
+        let mut body = row![self.rail()];
+        if self.screen == Screen::Home {
+            body = body.push(self.save_panel());
+        }
+        let mut page = Column::new();
+        if let Some(info) = &self.info {
+            page = page.push(info_bar(info));
+        }
+        let page = page
+            .push(body.push(self.main_pane()).height(Length::Fill))
+            .push(self.status_bar());
         match &self.modal {
             Some(modal) => stack![
                 page,
@@ -37,7 +44,7 @@ impl App {
     }
 
     fn rail(&self) -> Element<'_, Message> {
-        let buttons: Vec<Element<'_, Message>> = match &self.plugins {
+        let mut buttons: Vec<Element<'_, Message>> = match &self.plugins {
             Plugins::Loading => vec![text("…").into()],
             Plugins::Ready(registry) => registry
                 .entries()
@@ -45,9 +52,32 @@ impl App {
                 .map(|entry| self.rail_button(entry))
                 .collect(),
         };
+        buttons.push(space::vertical().into());
+        let store_active = matches!(self.screen, Screen::Store | Screen::PluginDetail(_));
+        buttons.extend([
+            nav_button(
+                "Store",
+                "Browse and install plugins",
+                Screen::Store,
+                store_active,
+            ),
+            nav_button(
+                "Settings",
+                "Catalog, folders and updates",
+                Screen::Settings,
+                self.screen == Screen::Settings,
+            ),
+            nav_button(
+                "About",
+                "Versions and licences",
+                Screen::About,
+                self.screen == Screen::About,
+            ),
+        ]);
         container(
             Column::with_children(buttons)
                 .spacing(8)
+                .height(Length::Fill)
                 .align_x(Alignment::Center),
         )
         .padding([12, 0])
@@ -60,7 +90,7 @@ impl App {
 
     fn rail_button<'a>(&'a self, entry: &'a PluginEntry) -> Element<'a, Message> {
         let id = entry.id();
-        let selected = self.home.selected.as_deref() == Some(id);
+        let selected = self.screen == Screen::Home && self.home.selected.as_deref() == Some(id);
         let (face, tip, on_press): (Element<'a, Message>, String, Option<Message>) = match entry {
             PluginEntry::Loaded(plugin) => {
                 let face = match &plugin.manifest.icon {
@@ -227,7 +257,24 @@ impl App {
     fn main_pane(&self) -> Element<'_, Message> {
         let content: Element<'_, Message> = if let Some(reason) = &self.fatal {
             center(text(reason.as_str()).style(theme::error_text)).into()
-        } else if let Some(editor) = &self.editor {
+        } else {
+            match &self.screen {
+                Screen::Home => self.home_pane(),
+                Screen::Store | Screen::PluginDetail(_) | Screen::Settings => {
+                    center(text("Loading…").style(theme::muted)).into()
+                }
+                Screen::About => settings_view::about(),
+            }
+        };
+        container(content)
+            .padding(16)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
+    }
+
+    fn home_pane(&self) -> Element<'_, Message> {
+        if let Some(editor) = &self.editor {
             if let Some(reason) = &editor.crashed {
                 center(
                     column![
@@ -267,12 +314,7 @@ impl App {
             center(text(busy.as_str()).style(theme::muted)).into()
         } else {
             center(text("Select a save on the left to edit it.").style(theme::muted)).into()
-        };
-        container(content)
-            .padding(16)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        }
     }
 
     fn status_bar(&self) -> Element<'_, Message> {
@@ -352,6 +394,39 @@ impl App {
             .style(theme::modal)
             .into()
     }
+}
+
+/// A rail button at the bottom that opens `screen`.
+fn nav_button<'a>(
+    label: &'a str,
+    tip: &'a str,
+    screen: Screen,
+    active: bool,
+) -> Element<'a, Message> {
+    let button = button(center(text(label).size(11)))
+        .width(56)
+        .height(32)
+        .padding(0)
+        .style(theme::rail_button(active))
+        .on_press(Message::Navigate(screen));
+    tooltip(button, text(tip), tooltip::Position::Right).into()
+}
+
+fn info_bar(info: &str) -> Element<'_, Message> {
+    container(
+        row![
+            text(info).width(Length::Fill),
+            button(text("Dismiss").size(12))
+                .style(button::secondary)
+                .on_press(Message::DismissInfo),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center),
+    )
+    .padding([6, 12])
+    .width(Length::Fill)
+    .style(theme::info_bar)
+    .into()
 }
 
 /// A plugin's first letter, used when it ships no icon.

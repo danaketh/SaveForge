@@ -1,6 +1,7 @@
 //! Application state and update logic (spec §5.1, §5.2). Rendering lives in
 //! `view.rs`.
 
+mod settings_view;
 mod view;
 
 use std::path::PathBuf;
@@ -22,6 +23,22 @@ use crate::editor::{Editor, EditorEffect};
 use crate::format::window_title;
 use crate::home::{Home, Saves, raw_save_dir, resolve_save_dir};
 use crate::render::UiMessage;
+
+/// Source repository, linked from About. Placeholder until the project is
+/// published, like `RELEASE_CATALOG_URL`.
+pub const REPOSITORY_URL: &str = "https://github.com/YOUR_ORG/YOUR_REPO";
+
+/// The page shown in the main area (spec §5.1). An open document lives on
+/// `Home` and survives visits to the other screens.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum Screen {
+    #[default]
+    Home,
+    Store,
+    PluginDetail(String),
+    Settings,
+    About,
+}
 
 /// Long-lived handles shared with worker threads.
 #[derive(Debug, Clone)]
@@ -99,6 +116,9 @@ pub enum Message {
     GuardDiscard,
     CancelModal,
     CloseRequested(window::Id),
+    Navigate(Screen),
+    DismissInfo,
+    OpenUrl(String),
 }
 
 #[derive(Debug)]
@@ -107,10 +127,13 @@ pub struct App {
     fatal: Option<String>,
     settings: AppSettings,
     plugins: Plugins,
+    screen: Screen,
     home: Home,
     editor: Option<Editor>,
     modal: Option<Modal>,
     status: Option<String>,
+    /// Notice shown above the main area until dismissed.
+    info: Option<String>,
     busy: Option<String>,
     /// Action to run once save request `.0` succeeds (from the unsaved guard).
     after_save: Option<(u64, Pending)>,
@@ -134,10 +157,12 @@ impl App {
             fatal: None,
             settings,
             plugins: Plugins::Loading,
+            screen: Screen::Home,
             home: Home::default(),
             editor: None,
             modal: None,
             status: warning,
+            info: None,
             busy: Some("Loading plugins…".to_owned()),
             after_save: None,
             next_request: 0,
@@ -157,10 +182,12 @@ impl App {
             fatal: Some(reason),
             settings,
             plugins: Plugins::Ready(PluginRegistry::default()),
+            screen: Screen::Home,
             home: Home::default(),
             editor: None,
             modal: None,
             status: None,
+            info: None,
             busy: None,
             after_save: None,
             next_request: 0,
@@ -173,6 +200,14 @@ impl App {
             self.editor.as_ref().map(Editor::file_name).as_deref(),
             self.editor.as_ref().is_some_and(|e| e.dirty),
         )
+    }
+
+    pub fn screen(&self) -> &Screen {
+        &self.screen
+    }
+
+    pub fn info(&self) -> Option<&str> {
+        self.info.as_deref()
     }
 
     pub fn home(&self) -> &Home {
@@ -235,6 +270,7 @@ impl App {
                 first.map_or_else(Task::none, |id| self.select_plugin(id))
             }
             Message::SelectPlugin(id) => {
+                self.screen = Screen::Home;
                 if self.home.selected.as_deref() == Some(id.as_str()) {
                     return Task::none();
                 }
@@ -355,6 +391,20 @@ impl App {
                 Task::none()
             }
             Message::CloseRequested(id) => self.guarded(Pending::Exit(id)),
+            Message::Navigate(screen) => {
+                self.screen = screen;
+                Task::none()
+            }
+            Message::DismissInfo => {
+                self.info = None;
+                Task::none()
+            }
+            Message::OpenUrl(url) => {
+                if let Err(e) = open::that_detached(&url) {
+                    self.status = Some(format!("Could not open {url}: {e}"));
+                }
+                Task::none()
+            }
         }
     }
 

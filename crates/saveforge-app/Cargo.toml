@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 iced.workspace = true
+open.workspace = true
 rfd.workspace = true
 saveforge-core.workspace = true
 saveforge-host.workspace = true

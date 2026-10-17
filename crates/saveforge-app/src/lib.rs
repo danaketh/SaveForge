@@ -10,4 +10,4 @@ pub mod render;
 pub mod theme;
 pub mod ui_state;
 
-pub use app::{App, Message, Modal, Pending, Plugins, Services, run};
+pub use app::{App, Message, Modal, Pending, Plugins, REPOSITORY_URL, Screen, Services, run};

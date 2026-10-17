@@ -76,6 +76,15 @@ pub fn section(_: &Theme) -> container::Style {
     }
 }
 
+/// The dismissible notice above the main area.
+pub fn info_bar(_: &Theme) -> container::Style {
+    container::Style {
+        text_color: Some(TEXT),
+        border: border(AMBER, 1.0, 0.0),
+        ..filled(BG3)
+    }
+}
+
 pub fn modal(_: &Theme) -> container::Style {
     container::Style {
         border: border(LINE2, 1.0, 8.0),
