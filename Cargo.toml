@@ -27,6 +27,7 @@ iced = { version = "0.14.0", features = ["tokio", "image"] }
 iced_test = "0.14.0"
 regex-lite = "0.1.9"
 rfd = "0.17.2"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 saveforge-core = { path = "crates/saveforge-core" }
 saveforge-host = { path = "crates/saveforge-host" }
 saveforge-plugin-api = { path = "crates/saveforge-plugin-api" }
@@ -45,6 +46,10 @@ tokio = { version = "1.53.2", default-features = false }
 tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-subscriber = "0.3.23"
+ureq = { version = "3.4.2", default-features = false, features = [
+    "rustls-no-provider",
+    "platform-verifier",
+] }
 wasmtime = { version = "49.0.3", default-features = false, features = [
     "runtime",
     "cranelift",

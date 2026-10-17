@@ -170,6 +170,34 @@ pub fn file_url(path: &Path) -> String {
     }
 }
 
+/// Inverse of [`file_url`]: the local path a `file://` URL names, with `%XX`
+/// escapes decoded. `None` for any other scheme.
+pub fn path_from_file_url(url: &str) -> Option<PathBuf> {
+    let rest = url.strip_prefix("file://")?;
+    let bytes = rest.as_bytes();
+    let rest = if bytes.len() >= 3
+        && bytes[0] == b'/'
+        && bytes[1].is_ascii_alphabetic()
+        && bytes[2] == b':'
+    {
+        &rest[1..]
+    } else {
+        rest
+    };
+    let mut decoded = Vec::with_capacity(rest.len());
+    let mut bytes = rest.bytes();
+    while let Some(b) = bytes.next() {
+        if b == b'%' {
+            let pair = [bytes.next()?, bytes.next()?];
+            let hex = std::str::from_utf8(&pair).ok()?;
+            decoded.push(u8::from_str_radix(hex, 16).ok()?);
+        } else {
+            decoded.push(b);
+        }
+    }
+    String::from_utf8(decoded).ok().map(PathBuf::from)
+}
+
 fn default_catalog_url(paths: &AppPaths) -> String {
     if cfg!(debug_assertions) {
         file_url(&paths.data_dir.join("catalog.json"))

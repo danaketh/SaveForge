@@ -8,6 +8,9 @@ yanked = "deny"
 ignore = [
     { id = "RUSTSEC-2024-0436", reason = "paste: via wgpu-hal/metal (macOS), unmaintained only" },
     { id = "RUSTSEC-2026-0192", reason = "ttf-parser: via cosmic-text/fontdb, unmaintained only" },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant: via iced_winit/mundy/zbus 5 (Linux), merged into zbus 6, unmaintained only" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names: via iced_winit/mundy/zbus 5 (Linux), merged into zbus 6, unmaintained only" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive: via iced_winit/mundy/zbus 5 (Linux), merged into zbus 6, unmaintained only" },
 ]
 
 [licenses]
@@ -27,6 +30,12 @@ allow = [
     "Unicode-3.0",
     "Zlib",
 ]
+
+[[licenses.exceptions]]
+# Dependency of rustls-platform-verifier on wasm32 targets only; never
+# compiled into SaveForge (the store crate is native-only).
+crate = "webpki-root-certs"
+allow = ["CDLA-Permissive-2.0"]
 
 [bans]
 multiple-versions = "warn"

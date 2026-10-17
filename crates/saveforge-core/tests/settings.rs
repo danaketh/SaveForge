@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use saveforge_core::paths::AppPaths;
-use saveforge_core::settings::{AppSettings, RELEASE_CATALOG_URL, file_url};
+use saveforge_core::settings::{AppSettings, RELEASE_CATALOG_URL, file_url, path_from_file_url};
 
 fn defaults(dir: &Path) -> AppSettings {
     AppSettings::defaults(&AppPaths::under(dir))
@@ -157,4 +157,22 @@ fn file_url_formats() {
         file_url(Path::new(r"C:\Users\u\catalog.json")),
         "file:///C:/Users/u/catalog.json"
     );
+}
+
+#[test]
+fn file_urls_round_trip() {
+    for p in [
+        r"C:\Users\John Smith\AppData\Roaming\SaveForge\catalog.json",
+        "/home/john smith/.local/share/saveforge/catalog.json",
+    ] {
+        assert_eq!(
+            path_from_file_url(&file_url(Path::new(p))),
+            Some(PathBuf::from(p.replace('\\', "/")))
+        );
+    }
+    assert_eq!(
+        path_from_file_url("file:///C:/a%20b/c.json"),
+        Some(PathBuf::from("C:/a b/c.json"))
+    );
+    assert_eq!(path_from_file_url("https://x/c.json"), None);
 }

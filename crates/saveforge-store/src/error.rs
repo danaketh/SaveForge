@@ -35,3 +35,12 @@ pub enum StoreError {
     #[error("invalid plugin id: {0}")]
     InvalidId(String),
 }
+
+impl StoreError {
+    pub(crate) fn io(path: &std::path::Path, source: io::Error) -> Self {
+        Self::Io {
+            path: path.to_path_buf(),
+            source,
+        }
+    }
+}
