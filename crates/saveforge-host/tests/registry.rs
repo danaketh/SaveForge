@@ -3,6 +3,7 @@ mod common;
 use std::fs;
 
 use saveforge_host::{MAX_FAULTS_PER_SESSION, PluginEntry, PluginRegistry};
+use semver::Version;
 use serde_json::Value;
 
 fn failed_reason(registry: &PluginRegistry, id: &str) -> String {
@@ -97,4 +98,72 @@ fn clones_share_loaded_plugins() {
         registry.loaded().next().unwrap(),
         copy.loaded().next().unwrap()
     ));
+}
+
+fn ids(registry: &PluginRegistry) -> Vec<&str> {
+    registry.entries().iter().map(PluginEntry::id).collect()
+}
+
+#[test]
+fn upsert_adds_and_replaces_in_id_order() {
+    let root = tempfile::tempdir().unwrap();
+    let engine = common::engine();
+    common::install_fixture(root.path(), "b-plugin", "0.1.0", |_| {});
+    let mut registry = PluginRegistry::scan(&engine, root.path());
+    common::install_fixture(root.path(), "a-plugin", "0.1.0", |_| {});
+    registry.upsert(PluginRegistry::load_entry(&engine, root.path(), "a-plugin"));
+    assert_eq!(ids(&registry), ["a-plugin", "b-plugin"]);
+    common::install_fixture(root.path(), "a-plugin", "0.2.0", |_| {});
+    registry.upsert(PluginRegistry::load_entry(&engine, root.path(), "a-plugin"));
+    assert_eq!(ids(&registry), ["a-plugin", "b-plugin"]);
+    assert_eq!(
+        registry.get("a-plugin").and_then(PluginEntry::version),
+        Some(Version::new(0, 2, 0))
+    );
+}
+
+#[test]
+fn upsert_resets_fault_count() {
+    let root = tempfile::tempdir().unwrap();
+    let engine = common::engine();
+    common::install_fixture(root.path(), "fix", "0.1.0", |_| {});
+    let mut registry = PluginRegistry::scan(&engine, root.path());
+    for _ in 1..MAX_FAULTS_PER_SESSION {
+        registry.record_fault("fix");
+    }
+    registry.upsert(PluginRegistry::load_entry(&engine, root.path(), "fix"));
+    for _ in 1..MAX_FAULTS_PER_SESSION {
+        assert!(!registry.record_fault("fix"));
+    }
+    assert!(matches!(registry.get("fix"), Some(PluginEntry::Loaded(_))));
+}
+
+#[test]
+fn remove_drops_the_entry() {
+    let root = tempfile::tempdir().unwrap();
+    common::install_fixture(root.path(), "a-plugin", "0.1.0", |_| {});
+    common::install_fixture(root.path(), "b-plugin", "0.1.0", |_| {});
+    let mut registry = PluginRegistry::scan(&common::engine(), root.path());
+    assert!(registry.remove("b-plugin"));
+    assert!(!registry.remove("b-plugin"));
+    assert!(registry.get("b-plugin").is_none());
+    assert_eq!(ids(&registry), ["a-plugin"]);
+}
+
+#[test]
+fn installed_versions_lists_loaded_and_failed() {
+    let root = tempfile::tempdir().unwrap();
+    common::install_fixture(root.path(), "x", "0.1.0", |_| {});
+    common::install_fixture(root.path(), "bad", "1.2.3", |m| {
+        m["apiVersion"] = Value::from("nope");
+    });
+    fs::create_dir_all(root.path().join("empty")).unwrap();
+    let registry = PluginRegistry::scan(&common::engine(), root.path());
+    assert_eq!(
+        registry.installed_versions(),
+        [
+            ("bad".to_owned(), Version::new(1, 2, 3)),
+            ("x".to_owned(), Version::new(0, 1, 0)),
+        ]
+    );
 }

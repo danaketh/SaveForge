@@ -3,7 +3,7 @@ mod common;
 use std::fs;
 
 use saveforge_core::CoreError;
-use saveforge_host::{HOST_VERSION, HostError, HostLimits, PluginEngine};
+use saveforge_host::{HOST_VERSION, HostError, HostLimits, PluginEngine, WASMTIME_VERSION};
 use serde_json::Value;
 
 #[test]
@@ -89,4 +89,24 @@ fn compile_cache_is_written() {
     let engine = PluginEngine::new(common::test_limits(), Some(cache.path())).unwrap();
     engine.load(&dir).unwrap();
     assert!(fs::read_dir(cache.path()).unwrap().count() > 0);
+}
+
+#[test]
+fn wasmtime_version_matches_the_lockfile() {
+    let lock =
+        fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Cargo.lock")).unwrap();
+    let block = lock
+        .split("[[package]]")
+        .find(|b| {
+            b.contains(
+                "
+name = \"wasmtime\"
+",
+            )
+        })
+        .unwrap();
+    assert!(
+        block.contains(&format!("version = \"{WASMTIME_VERSION}\"")),
+        "{block}"
+    );
 }

@@ -22,6 +22,10 @@ pub static HOST_VERSION: LazyLock<Version> = LazyLock::new(|| {
     Version::parse(env!("CARGO_PKG_VERSION")).expect("crate version is valid semver")
 });
 
+/// The `wasmtime` release this host is built against (shown in About; a
+/// test keeps it in step with `Cargo.lock`).
+pub const WASMTIME_VERSION: &str = "49.0.3";
+
 /// Epoch tick length. Call deadlines are counted in ticks.
 pub const TICK: Duration = Duration::from_millis(10);
 

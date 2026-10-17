@@ -30,6 +30,15 @@ impl PluginEntry {
             Self::Failed { id, .. } => id,
         }
     }
+
+    /// The manifest version, or for a failed entry the version its folder
+    /// names (`None` when the folder is not a version).
+    pub fn version(&self) -> Option<Version> {
+        match self {
+            Self::Loaded(plugin) => Some(plugin.manifest.version.clone()),
+            Self::Failed { dir, .. } => Version::parse(&dir.file_name()?.to_string_lossy()).ok(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -59,6 +68,41 @@ impl PluginRegistry {
             entries,
             faults: HashMap::new(),
         }
+    }
+
+    /// Loads the newest installed version of plugin `id` alone, for installs
+    /// that should not rescan everything.
+    pub fn load_entry(engine: &PluginEngine, plugins_dir: &Path, id: &str) -> PluginEntry {
+        load_newest(engine, id.to_owned(), &plugins_dir.join(id))
+    }
+
+    /// Replaces the entry with the same id, or inserts it in id order. The
+    /// plugin's fault count starts over.
+    pub fn upsert(&mut self, entry: PluginEntry) {
+        self.faults.remove(entry.id());
+        match self
+            .entries
+            .binary_search_by(|existing| existing.id().cmp(entry.id()))
+        {
+            Ok(index) => self.entries[index] = entry,
+            Err(index) => self.entries.insert(index, entry),
+        }
+    }
+
+    /// Drops plugin `id`. Returns whether it was present.
+    pub fn remove(&mut self, id: &str) -> bool {
+        self.faults.remove(id);
+        let before = self.entries.len();
+        self.entries.retain(|entry| entry.id() != id);
+        self.entries.len() != before
+    }
+
+    /// `(id, version)` for every entry whose version is known.
+    pub fn installed_versions(&self) -> Vec<(String, Version)> {
+        self.entries
+            .iter()
+            .filter_map(|entry| Some((entry.id().to_owned(), entry.version()?)))
+            .collect()
     }
 
     pub fn entries(&self) -> &[PluginEntry] {
