@@ -119,6 +119,7 @@ fn info_bar_can_be_dismissed() {
     };
     let _ = app.update(Message::UpdatesChecked {
         url: app.settings().catalog_url.clone(),
+        manual: false,
         result: Ok((load, vec![update])),
     });
     assert_ne!(app.info(), None);

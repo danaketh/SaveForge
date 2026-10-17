@@ -140,12 +140,12 @@ impl App {
             EntryStatus::NotInstalled => action("Install", Message::InstallPlugin(id)).into(),
             EntryStatus::UpdateAvailable { .. } => row![
                 action("Update", Message::UpdatePlugin(id.clone())),
-                action("Remove", Message::RemovePlugin(id)).style(button::danger),
+                action("Remove", Message::RemovePlugin(id)).style(theme::danger_button),
             ]
             .spacing(8)
             .into(),
             EntryStatus::Installed { .. } => action("Remove", Message::RemovePlugin(id))
-                .style(button::danger)
+                .style(theme::danger_button)
                 .into(),
             EntryStatus::Incompatible => {
                 let needs = match &entry.max_host_version {

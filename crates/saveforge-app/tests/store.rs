@@ -428,6 +428,7 @@ fn startup_update_check_reports_updates() {
     };
     let _ = app.update(Message::UpdatesChecked {
         url: app.settings().catalog_url.clone(),
+        manual: false,
         result: Ok((catalog_load(&world), vec![update])),
     });
     assert_eq!(
@@ -449,6 +450,7 @@ fn failed_update_check_points_to_settings() {
     let mut app = app_with(&world, s);
     let _ = app.update(Message::UpdatesChecked {
         url: app.settings().catalog_url.clone(),
+        manual: false,
         result: Err("offline".to_owned()),
     });
     assert_eq!(
@@ -571,6 +573,7 @@ fn stale_update_check_does_not_restore_the_old_catalog() {
     };
     let _ = app.update(Message::UpdatesChecked {
         url: old_url,
+        manual: false,
         result: Ok((catalog_load(&world), vec![update])),
     });
     assert!(matches!(
@@ -578,4 +581,135 @@ fn stale_update_check_does_not_restore_the_old_catalog() {
         saveforge_app::store::CatalogState::NotLoaded
     ));
     assert_eq!(app.info(), None);
+}
+
+fn one_update() -> Update {
+    Update {
+        id: "test-plugin".to_owned(),
+        name: "Test Plugin".to_owned(),
+        installed: Version::new(0, 1, 0),
+        latest: Version::new(0, 2, 0),
+    }
+}
+
+fn checked(app: &mut App, load: CatalogLoad, manual: bool, updates: Vec<Update>) {
+    let url = app.settings().catalog_url.clone();
+    let _ = app.update(Message::UpdatesChecked {
+        url,
+        manual,
+        result: Ok((load, updates)),
+    });
+}
+
+#[test]
+fn manual_check_with_no_updates_says_so() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    let _ = app.update(Message::CheckUpdatesNow);
+    assert_eq!(app.status(), Some("Checking for plugin updates…"));
+    checked(&mut app, catalog_load(&world), true, vec![]);
+    assert_eq!(app.status(), Some("All plugins are up to date."));
+}
+
+#[test]
+fn clean_check_clears_the_info_bar() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    checked(&mut app, catalog_load(&world), false, vec![one_update()]);
+    assert_ne!(app.info(), None);
+    checked(&mut app, catalog_load(&world), false, vec![]);
+    assert_eq!(app.info(), None);
+}
+
+#[test]
+fn updating_the_last_outdated_plugin_clears_the_info_bar() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    let mut load = catalog_load(&world);
+    load.catalog.plugins[0].latest_version = Version::new(0, 2, 0);
+    checked(&mut app, load, false, vec![one_update()]);
+    assert_ne!(app.info(), None);
+
+    let _ = app.update(Message::UpdatePlugin("test-plugin".to_owned()));
+    let request = job_request(&app);
+    // The job's work, done here: version 0.2.0 installed next to 0.1.0.
+    let new_dir = world.plugins_dir().join("test-plugin/0.2.0");
+    fs::create_dir_all(&new_dir).unwrap();
+    for file in ["manifest.json", "plugin.wasm"] {
+        fs::copy(
+            world.plugins_dir().join("test-plugin/0.1.0").join(file),
+            new_dir.join(file),
+        )
+        .unwrap();
+    }
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(new_dir.join("manifest.json")).unwrap()).unwrap();
+    manifest["version"] = serde_json::Value::from("0.2.0");
+    fs::write(new_dir.join("manifest.json"), manifest.to_string()).unwrap();
+    let entry =
+        PluginRegistry::load_entry(&world.services.engine, &world.plugins_dir(), "test-plugin");
+    assert!(matches!(entry, PluginEntry::Loaded(_)), "{entry:?}");
+
+    let _ = app.update(Message::JobFinished {
+        request,
+        result: Ok(JobOutcome::Installed {
+            entry,
+            name: "Test Plugin".to_owned(),
+            version: Version::new(0, 2, 0),
+            replaced: Some(Version::new(0, 1, 0)),
+        }),
+    });
+    assert_eq!(app.status(), Some("Updated Test Plugin to 0.2.0."));
+    assert_eq!(app.info(), None);
+}
+
+#[test]
+fn jobs_wait_for_plugins_to_load() {
+    let world = World::new();
+    let (mut app, _task) = App::new(world.services.clone(), settings(&world), None);
+    let _ = app.update(Message::Navigate(Screen::Store));
+    let request = app.catalog_request().unwrap();
+    let _ = app.update(Message::CatalogLoaded {
+        request,
+        result: Ok(catalog_load(&world)),
+    });
+    let _ = app.update(Message::InstallPlugin("other".to_owned()));
+    assert!(app.store().job.is_none());
+    assert_eq!(app.status(), Some("Plugins are still loading."));
+}
+
+#[test]
+fn opening_a_save_of_a_plugin_being_removed_is_refused() {
+    let world = World::new();
+    let mut app = store_app(&world);
+    let _ = app.update(Message::RemovePlugin("test-plugin".to_owned()));
+    job_request(&app);
+
+    let path = world.save_file("a.fixture", "hello");
+    let _ = app.update(Message::OpenSave(path.clone()));
+    let request = app.open_request().unwrap();
+    let detected =
+        saveforge_app::documents::detect_file(&world.services.engine, &world.registry(), &path);
+    let _ = app.update(Message::Detected {
+        request,
+        path,
+        result: detected,
+    });
+    assert!(app.editor().is_none());
+    assert_eq!(app.open_request(), None);
+    assert_eq!(app.busy(), None);
+    assert_eq!(app.status(), Some("Test Plugin is being removed."));
+}
+
+#[test]
+fn danger_buttons_have_readable_text() {
+    use iced::Background;
+    use iced::widget::button;
+    use saveforge_app::theme;
+
+    let style = theme::danger_button(&theme::theme(), button::Status::Active);
+    assert_eq!(style.text_color, theme::TEXT);
+    assert_eq!(style.background, Some(Background::Color(theme::RED)));
+    let disabled = theme::danger_button(&theme::theme(), button::Status::Disabled);
+    assert_eq!(disabled.text_color, theme::TEXT_FAINT);
 }

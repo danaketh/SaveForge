@@ -155,6 +155,8 @@ pub enum Message {
         /// The catalog URL checked; a result for a URL since replaced in
         /// Settings is ignored.
         url: String,
+        /// Started with "Check now" rather than at startup.
+        manual: bool,
         result: Result<(CatalogLoad, Vec<Update>), String>,
     },
 }
@@ -335,7 +337,7 @@ impl App {
                 self.plugins = Plugins::Ready(registry);
                 let select = first.map_or_else(Task::none, |id| self.select_plugin(id));
                 if self.settings.check_updates_on_startup {
-                    Task::batch([select, self.start_update_check()])
+                    Task::batch([select, self.start_update_check(false)])
                 } else {
                     select
                 }
@@ -504,7 +506,7 @@ impl App {
                 self.save_settings();
                 Task::none()
             }
-            Message::CheckUpdatesNow => self.start_update_check(),
+            Message::CheckUpdatesNow => self.start_update_check(true),
             Message::CatalogLoaded { request, result } => {
                 self.catalog_loaded(request, result);
                 Task::none()
@@ -531,8 +533,12 @@ impl App {
                 self.job_finished(request, result);
                 Task::none()
             }
-            Message::UpdatesChecked { url, result } => {
-                self.updates_checked(&url, result);
+            Message::UpdatesChecked {
+                url,
+                manual,
+                result,
+            } => {
+                self.updates_checked(&url, manual, result);
                 Task::none()
             }
             Message::DismissInfo => {
@@ -715,7 +721,7 @@ impl App {
 
     /// Fetches the catalog and compares it with what is installed (spec §5.2
     /// Startup step 4).
-    fn start_update_check(&mut self) -> Task<Message> {
+    fn start_update_check(&mut self, manual: bool) -> Task<Message> {
         let (Some(services), Some(registry)) = (&self.services, self.registry()) else {
             return Task::none();
         };
@@ -732,12 +738,18 @@ impl App {
             },
             move |result| Message::UpdatesChecked {
                 url: checked.clone(),
+                manual,
                 result,
             },
         )
     }
 
-    fn updates_checked(&mut self, url: &str, result: Result<(CatalogLoad, Vec<Update>), String>) {
+    fn updates_checked(
+        &mut self,
+        url: &str,
+        manual: bool,
+        result: Result<(CatalogLoad, Vec<Update>), String>,
+    ) {
         if url != self.settings.catalog_url {
             // The catalog URL changed in Settings since this check started.
             if self.status.as_deref() == Some(CHECKING_UPDATES) {
@@ -750,12 +762,10 @@ impl App {
                 if self.status.as_deref() == Some(CHECKING_UPDATES) {
                     self.status = None;
                 }
-                if !updates.is_empty() {
-                    self.info = Some(format!(
-                        "Updates available for {} plugin(s). Go to Store to update.",
-                        updates.len()
-                    ));
+                if updates.is_empty() && manual {
+                    self.status = Some("All plugins are up to date.".to_owned());
                 }
+                self.info = updates_info(updates.len());
                 if self.catalog_request.is_none() {
                     self.store.catalog = CatalogState::Ready(load);
                 }
@@ -784,6 +794,10 @@ impl App {
 
     /// Starts an install, update or remove; ignored while another job runs.
     fn start_job(&mut self, kind: JobKind, id: String) -> Task<Message> {
+        if matches!(self.plugins, Plugins::Loading) {
+            self.status = Some("Plugins are still loading.".to_owned());
+            return Task::none();
+        }
         if self.store.job.is_some() {
             return Task::none();
         }
@@ -860,6 +874,16 @@ impl App {
                     PluginEntry::Loaded(_) => None,
                 };
                 registry.upsert(entry);
+                // The info bar counts outdated plugins; recount after an update.
+                if self.info.is_some()
+                    && let CatalogState::Ready(load) = &self.store.catalog
+                {
+                    let left = load
+                        .catalog
+                        .updates(&registry.installed_versions(), &HOST_VERSION)
+                        .len();
+                    self.info = updates_info(left);
+                }
                 match (failed, replaced) {
                     (Some(reason), _) => {
                         format!("Installed {name} {version}, but it could not be loaded: {reason}")
@@ -947,6 +971,17 @@ impl App {
         let Some(services) = &self.services else {
             return Task::none();
         };
+        if self
+            .store
+            .job
+            .as_ref()
+            .is_some_and(|job| job.kind == JobKind::Remove && job.plugin_id == plugin.manifest.id)
+        {
+            self.pending_open = None;
+            self.busy = None;
+            self.status = Some(format!("{} is being removed.", plugin.manifest.name));
+            return Task::none();
+        }
         self.busy = Some(format!("Opening with {}…", plugin.manifest.name));
         let engine = Arc::clone(&services.engine);
         let tokens = Arc::clone(&services.tokens);
@@ -1035,6 +1070,11 @@ impl App {
             ));
         }
     }
+}
+
+/// The info bar text for `count` outdated plugins, or none.
+fn updates_info(count: usize) -> Option<String> {
+    (count > 0).then(|| format!("Updates available for {count} plugin(s). Go to Store to update."))
 }
 
 /// A link that is safe to hand to the OS: `https://` only.

@@ -377,7 +377,7 @@ impl App {
                     row![
                         button("Save").on_press(Message::GuardSave),
                         button("Discard")
-                            .style(button::danger)
+                            .style(theme::danger_button)
                             .on_press(Message::GuardDiscard),
                         button("Cancel")
                             .style(button::secondary)

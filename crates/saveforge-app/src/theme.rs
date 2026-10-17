@@ -120,6 +120,30 @@ pub fn rail_button(selected: bool) -> impl Fn(&Theme, button::Status) -> button:
     }
 }
 
+/// A destructive action (Remove, Discard): red with readable light text.
+pub fn danger_button(_: &Theme, status: button::Status) -> button::Style {
+    let background = match status {
+        button::Status::Active => RED,
+        button::Status::Hovered | button::Status::Pressed => Color {
+            r: (RED.r + 0.1).min(1.0),
+            g: (RED.g + 0.1).min(1.0),
+            b: (RED.b + 0.1).min(1.0),
+            ..RED
+        },
+        button::Status::Disabled => BG3,
+    };
+    button::Style {
+        background: Some(Background::Color(background)),
+        text_color: if status == button::Status::Disabled {
+            TEXT_FAINT
+        } else {
+            TEXT
+        },
+        border: border(background, 1.0, 4.0),
+        ..button::Style::default()
+    }
+}
+
 /// A row in the save list; `current` marks the file open in the editor.
 pub fn save_row(current: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |_, status| {
