@@ -157,3 +157,19 @@ fn api_version_matches_the_host() {
     let host = saveforge_plugin_api::API_VERSION;
     assert_eq!(API_VERSION, format!("{}.{}", host.major, host.minor));
 }
+
+#[test]
+fn display_name_stays_out_of_doc_comments() {
+    // clippy::doc_markdown rejects CamelCase words like "RimWorld" in docs.
+    let mut plugin = NewPlugin::new("rimworld").unwrap();
+    plugin.name = "RimWorld Save Editor".to_owned();
+    let root = workspace();
+    let dir = scaffold(root.path(), &plugin).unwrap();
+    for file in files_under(&dir) {
+        for line in fs::read_to_string(&file).unwrap().lines() {
+            if line.trim_start().starts_with("//") {
+                assert!(!line.contains("RimWorld"), "{}: {line}", file.display());
+            }
+        }
+    }
+}
