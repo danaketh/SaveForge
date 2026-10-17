@@ -191,3 +191,68 @@ fn values_are_json_objects() {
         json!({ "craftedObjects": 50, "totalSaveFileLoad": 0, "totalSaveFileTime": 3600 })
     );
 }
+
+fn edited_text(groups: [&[&str]; 11], edit: impl FnOnce(&mut SaveFile)) -> String {
+    let mut save = parse(&common::build(&groups));
+    edit(&mut save);
+    save.to_text()
+}
+
+#[test]
+fn edits_keep_the_spelling_of_untouched_values() {
+    let mut groups = common::GROUPS;
+    groups[0] = &[r#"{"a":"café \/","terraTokens":1,"allTimeTerraTokens":2}"#];
+    let text = edited_text(groups, |save| {
+        assert!(save.single_mut(0).set("terraTokens", json!(2)));
+    });
+    assert!(
+        text.contains(r#"{"a":"café \/","terraTokens":2,"allTimeTerraTokens":2}"#),
+        "{text}"
+    );
+}
+
+#[test]
+fn duplicate_keys_survive_and_the_last_one_is_edited() {
+    let mut groups = common::GROUPS;
+    groups[9] = &[r#"{"x":1,"x":2}"#];
+    let save = parse(&common::build(&groups));
+    assert_eq!(save.group(9).objects()[0].get("x"), Some(&json!(2)));
+    let text = edited_text(groups, |save| {
+        assert!(save.group_mut(9).objects_mut()[0].set("x", json!(3)));
+    });
+    assert!(text.contains(r#"{"x":1,"x":3}"#), "{text}");
+}
+
+#[test]
+fn new_keys_are_appended() {
+    let mut groups = common::GROUPS;
+    groups[7] = &["{}"];
+    groups[9] = &[r#"{ "a": 1 }"#];
+    groups[10] = &[r#"{"a":1}"#];
+    let text = edited_text(groups, |save| {
+        assert!(save.group_mut(9).objects_mut()[0].set("a", json!(5)));
+        assert!(save.group_mut(10).objects_mut()[0].set("b", json!(true)));
+        assert!(save.group_mut(7).objects_mut()[0].set("b", json!(true)));
+    });
+    assert!(text.contains(r#"{ "a": 5 }"#), "{text}");
+    assert!(text.contains(r#"{"a":1,"b":true}"#), "{text}");
+    assert!(text.contains(r#"{"b":true}"#), "{text}");
+}
+
+#[test]
+fn errors_report_positions_in_the_file() {
+    let broken = r#"{"id":11,}"#;
+    let text = common::minimal().replacen(r#"{"id":11,"gId":"Iron"}"#, broken, 1);
+    let start = text.find(broken).unwrap();
+    let line = text[..start].matches('\n').count() + 1;
+    let line_start = text[..start].rfind('\n').map_or(0, |i| i + 1);
+    // serde points at the closing brace, the 10th character of the object.
+    let column = start - line_start + 10;
+    let err = parse_err(&text);
+    assert!(
+        err.starts_with(&format!(
+            "WorldObjects object 2 is not valid JSON at line {line} column {column}: "
+        )),
+        "{err}"
+    );
+}

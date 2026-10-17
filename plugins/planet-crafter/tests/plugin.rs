@@ -97,3 +97,12 @@ fn manifest_points_at_the_game_save_folder() {
     );
     assert!(dirs["macos"].is_null());
 }
+
+#[test]
+fn icon_is_at_most_256_pixels() {
+    let icon = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/icon.png")).unwrap();
+    let width = u32::from_be_bytes(icon[16..20].try_into().unwrap());
+    let height = u32::from_be_bytes(icon[20..24].try_into().unwrap());
+    assert!(width <= 256 && height <= 256, "{width}x{height}");
+    assert!(icon.len() < 200_000, "{} bytes", icon.len());
+}

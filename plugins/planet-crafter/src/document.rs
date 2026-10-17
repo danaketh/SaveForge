@@ -6,7 +6,7 @@ use serde_json::{Number, Value};
 
 use crate::format::Object;
 use crate::localization::Names;
-use crate::save::{self, DISPLAY_INFO, Item, STATS, Save, TERRA_TOKENS, int, text};
+use crate::save::{self, DISPLAY_INFO, STATS, Save, TERRA_TOKENS, int, text};
 
 /// Widget ids.
 pub const TABS: &str = "tabs";
@@ -283,11 +283,7 @@ impl PlanetCrafterDocument {
         let Some(inventory) = self.selected_inventory(list_id) else {
             return false;
         };
-        let item: Option<Item> = self
-            .save
-            .inventory_items(inventory)
-            .and_then(|items| items.into_iter().nth(index as usize));
-        item.is_some_and(|item| self.save.remove_item(inventory, item.world_object_id))
+        self.save.remove_item_at(inventory, index as usize)
     }
 }
 

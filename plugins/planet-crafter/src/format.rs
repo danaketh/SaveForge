@@ -2,11 +2,13 @@
 //!
 //! A save is a sequence of groups separated by `@`, and a group holds JSON
 //! objects separated by `|`. Everything between objects (whitespace, the
-//! separators, a leading byte order mark) is kept verbatim, and an object is
-//! written back from its original text unless it was edited. An unmodified
-//! save therefore serializes byte for byte as it was read.
+//! separators, a leading byte order mark) is kept verbatim, and so is each
+//! object's own text: an edit replaces only the edited value's text. An
+//! unmodified save therefore serializes byte for byte as it was read, and an
+//! edited one differs only where it was edited.
 
 use std::mem;
+use std::ops::Range;
 
 use serde_json::{Map, Value};
 
@@ -33,21 +35,19 @@ const SINGLE_GROUPS: [usize; 3] = [0, 5, 8];
 /// Separator for objects appended to a group that has no separator to copy.
 const DEFAULT_SEPARATOR: &str = "|\n";
 
-/// One JSON object of a group.
+/// One JSON object of a group: its parsed fields and its exact text.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
     raw: String,
     fields: Map<String, Value>,
-    edited: bool,
 }
 
 impl Object {
     /// A new object, written out compactly.
     pub fn new(fields: Map<String, Value>) -> Self {
         Self {
-            raw: String::new(),
+            raw: Value::Object(fields.clone()).to_string(),
             fields,
-            edited: true,
         }
     }
 
@@ -59,21 +59,111 @@ impl Object {
         &self.fields
     }
 
-    /// Sets `key`, keeping its position. Returns whether anything changed.
+    /// Sets `key`. Only the text of its value changes: of its last
+    /// occurrence when the key is repeated (the one parsing keeps), or a new
+    /// member after the last one. Returns whether anything changed.
     pub fn set(&mut self, key: &str, value: Value) -> bool {
         if self.fields.get(key) == Some(&value) {
             return false;
         }
+        let text = value.to_string();
+        let members = members(&self.raw);
+        if let Some((_, range)) = members.iter().rev().find(|(k, _)| k == key) {
+            self.raw.replace_range(range.clone(), &text);
+        } else {
+            let name = Value::from(key).to_string();
+            if let Some((_, last)) = members.last() {
+                self.raw.insert_str(last.end, &format!(",{name}:{text}"));
+            } else {
+                let close = self.raw.rfind('}').unwrap_or(self.raw.len());
+                self.raw.insert_str(close, &format!("{name}:{text}"));
+            }
+        }
         self.fields.insert(key.to_owned(), value);
-        self.edited = true;
         true
     }
 
     fn write(&self, out: &mut String) {
-        if self.edited {
-            out.push_str(&Value::Object(self.fields.clone()).to_string());
-        } else {
-            out.push_str(&self.raw);
+        out.push_str(&self.raw);
+    }
+}
+
+/// The top-level members of a JSON object's text: each decoded key and the
+/// byte range of its value. `raw` is text the JSON parser accepted.
+fn members(raw: &str) -> Vec<(String, Range<usize>)> {
+    let bytes = raw.as_bytes();
+    let skip_space = |mut i: usize| {
+        while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
+            i += 1;
+        }
+        i
+    };
+    let mut found = Vec::new();
+    let mut i = skip_space(1);
+    while bytes.get(i) == Some(&b'"') {
+        let key_end = string_end(bytes, i);
+        let key = serde_json::from_str(&raw[i..key_end]).unwrap_or_default();
+        i = skip_space(key_end) + 1; // past ':'
+        let start = skip_space(i);
+        let end = value_end(bytes, start);
+        found.push((key, start..end));
+        i = skip_space(end);
+        if bytes.get(i) != Some(&b',') {
+            break;
+        }
+        i = skip_space(i + 1);
+    }
+    found
+}
+
+/// The index after the string that starts at `start` (a `"`).
+fn string_end(bytes: &[u8], start: usize) -> usize {
+    let mut i = start + 1;
+    while let Some(&b) = bytes.get(i) {
+        match b {
+            b'\\' => i += 2,
+            b'"' => return i + 1,
+            _ => i += 1,
+        }
+    }
+    bytes.len()
+}
+
+/// The index after the JSON value that starts at `start`.
+fn value_end(bytes: &[u8], start: usize) -> usize {
+    match bytes.get(start) {
+        Some(b'"') => string_end(bytes, start),
+        Some(b'{' | b'[') => {
+            let mut depth = 0usize;
+            let mut i = start;
+            while let Some(&b) = bytes.get(i) {
+                match b {
+                    b'"' => {
+                        i = string_end(bytes, i);
+                        continue;
+                    }
+                    b'{' | b'[' => depth += 1,
+                    b'}' | b']' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            return i + 1;
+                        }
+                    }
+                    _ => {}
+                }
+                i += 1;
+            }
+            bytes.len()
+        }
+        _ => {
+            let mut i = start;
+            while bytes
+                .get(i)
+                .is_some_and(|b| !matches!(b, b',' | b'}' | b']') && !b.is_ascii_whitespace())
+            {
+                i += 1;
+            }
+            i
         }
     }
 }
@@ -159,8 +249,13 @@ impl SaveFile {
                     let fields = match stream.next() {
                         Some(Ok(fields)) => fields,
                         Some(Err(e)) => {
+                            let (line, column) = file_position(text, i, &e);
+                            let message = e.to_string();
+                            let reason = message
+                                .rsplit_once(" at line ")
+                                .map_or(message.as_str(), |(reason, _)| reason);
                             return Err(format!(
-                                "{} object {} is not valid JSON: {e}",
+                                "{} object {} is not valid JSON at line {line} column {column}: {reason}",
                                 group_name(groups.len()),
                                 group.objects.len() + 1
                             ));
@@ -172,7 +267,6 @@ impl SaveFile {
                     group.objects.push(Object {
                         raw: text[i..end].to_owned(),
                         fields,
-                        edited: false,
                     });
                     after_separator = false;
                     i = end;
@@ -238,6 +332,20 @@ impl SaveFile {
         }
         out
     }
+}
+
+/// Where in the whole file a JSON error inside the object starting at byte
+/// `start` is: 1-based line and column, as serde counts them.
+fn file_position(text: &str, start: usize, error: &serde_json::Error) -> (usize, usize) {
+    let before = &text[..start];
+    let line = before.matches('\n').count() + error.line();
+    let column = if error.line() == 1 {
+        let line_start = before.rfind('\n').map_or(0, |n| n + 1);
+        start - line_start + error.column()
+    } else {
+        error.column()
+    };
+    (line, column)
 }
 
 fn group_name(index: usize) -> String {

@@ -252,7 +252,7 @@ fn adding_and_removing_items() {
     let save = saved(&doc);
     assert_eq!(
         save.group(4).objects()[0].get("woIds"),
-        Some(&json!("10,99"))
+        Some(&json!("10,99,x"))
     );
     assert_eq!(save.group(4).objects()[1].get("woIds"), Some(&json!("13")));
 }

@@ -69,10 +69,10 @@ fn add_item_creates_a_world_object_with_the_next_id() {
 }
 
 #[test]
-fn add_item_rewrites_wo_ids_comma_joined() {
+fn add_item_appends_to_wo_ids_and_keeps_the_rest() {
     let mut save = minimal();
     assert_eq!(save.add_item(5, "Titanium"), Some(13));
-    assert_eq!(wo_ids(&save, 0), "10,11,99,13");
+    assert_eq!(wo_ids(&save, 0), "10,11,99,x,13");
 }
 
 #[test]
@@ -93,17 +93,17 @@ fn add_item_to_a_save_without_world_objects_starts_at_one() {
 #[test]
 fn remove_item_drops_the_id_but_keeps_the_world_object() {
     let mut save = minimal();
-    assert!(save.remove_item(5, 11));
+    assert!(save.remove_item_at(5, 1));
     assert_eq!(save.inventory_items(5), Some(vec![item(10, "Cobalt")]));
-    assert_eq!(wo_ids(&save, 0), "10,99");
+    assert_eq!(wo_ids(&save, 0), "10,99,x");
     assert!(save.gids().contains(&"Iron".to_owned()));
 }
 
 #[test]
 fn remove_item_that_is_not_there_changes_nothing() {
     let mut save = minimal();
-    assert!(!save.remove_item(5, 12));
-    assert!(!save.remove_item(8, 10));
+    assert!(!save.remove_item_at(5, 2));
+    assert!(!save.remove_item_at(8, 0));
     assert_eq!(save.to_bytes(), common::minimal().into_bytes());
 }
 
@@ -128,4 +128,48 @@ fn sample_save_links_player_inventories() {
     let items = save.inventory_items(inventory).unwrap();
     assert_ne!(items.len(), 0);
     assert!(items.iter().all(|i| !i.gid.is_empty()));
+}
+
+/// The minimal save with inventory 5's `woIds` replaced.
+fn with_inventory(wo_ids: &str) -> Save {
+    let text = common::minimal().replacen(
+        r#""woIds":"10,11,99,x""#,
+        &format!(r#""woIds":"{wo_ids}""#),
+        1,
+    );
+    Save::parse(text.as_bytes()).unwrap()
+}
+
+#[test]
+fn removing_a_duplicated_id_removes_the_chosen_row() {
+    let mut save = with_inventory("10,11,10");
+    assert_eq!(
+        save.inventory_items(5),
+        Some(vec![
+            item(10, "Cobalt"),
+            item(11, "Iron"),
+            item(10, "Cobalt")
+        ])
+    );
+    assert!(save.remove_item_at(5, 2));
+    assert_eq!(wo_ids(&save, 0), "10,11");
+}
+
+#[test]
+fn woids_edits_keep_the_rest_verbatim() {
+    let mut save = with_inventory("10, 11|x,12");
+    assert_eq!(save.add_item(5, "Iron"), Some(13));
+    assert_eq!(wo_ids(&save, 0), "10, 11|x,12,13");
+    assert!(save.remove_item_at(5, 1));
+    assert_eq!(wo_ids(&save, 0), "10|x,12,13");
+}
+
+#[test]
+fn new_ids_stay_within_i32() {
+    let mut groups = common::GROUPS;
+    groups[3] = &[r#"{"id":2147483647,"gId":"Big"}"#];
+    let text = common::build(&groups);
+    let mut save = Save::parse(text.as_bytes()).unwrap();
+    assert_eq!(save.add_item(6, "Iron"), None);
+    assert_eq!(save.to_bytes(), text.into_bytes());
 }
