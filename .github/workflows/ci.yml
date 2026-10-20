@@ -62,13 +62,10 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest
       - run: cargo xtask plugins
-      # nextest runs test binaries in parallel. There are no doctests; add
-      # `cargo test --workspace --doc` if some appear.
-      - run: cargo nextest run --workspace --no-fail-fast
+      # Not nextest: its process per test recompiles the plugin wasm in every
+      # test (472 s of test time against 110 s for cargo test, measured).
+      - run: cargo test --workspace
 
   msrv:
     name: MSRV (1.96)
