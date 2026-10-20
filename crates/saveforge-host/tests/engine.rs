@@ -95,18 +95,11 @@ fn compile_cache_is_written() {
 fn wasmtime_version_matches_the_lockfile() {
     let lock =
         fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Cargo.lock")).unwrap();
+    // `lines()` so a CRLF checkout (Windows CI) matches too.
     let block = lock
         .split("[[package]]")
-        .find(|b| {
-            b.contains(
-                "
-name = \"wasmtime\"
-",
-            )
-        })
+        .find(|b| b.lines().any(|l| l == "name = \"wasmtime\""))
         .unwrap();
-    assert!(
-        block.contains(&format!("version = \"{WASMTIME_VERSION}\"")),
-        "{block}"
-    );
+    let version = format!("version = \"{WASMTIME_VERSION}\"");
+    assert!(block.lines().any(|l| l == version), "{block}");
 }
