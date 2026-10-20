@@ -34,6 +34,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
+        # Skipped until someone uses the editor on Linux or macOS. Delete
+        # these entries to run them again, and make them required checks.
+        exclude:
+          - os: ubuntu-latest
+          - os: macos-latest
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
