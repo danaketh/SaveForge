@@ -1,0 +1,3 @@
+# Check out LF everywhere, Windows included: tests compare file text
+# (workflows, Cargo.lock, save fixtures) byte for byte.
+* text=auto eol=lf
