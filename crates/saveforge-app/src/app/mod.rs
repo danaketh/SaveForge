@@ -30,9 +30,8 @@ use crate::render::UiMessage;
 use crate::settings_form::{SettingsField, SettingsForm};
 use crate::store::{CatalogState, Job, JobKind, JobOutcome, StoreState, job_task, run_install};
 
-/// Source repository, linked from About. Placeholder until the project is
-/// published, like `RELEASE_CATALOG_URL`.
-pub const REPOSITORY_URL: &str = "https://github.com/YOUR_ORG/YOUR_REPO";
+/// Source repository, linked from About.
+pub const REPOSITORY_URL: &str = "https://github.com/danaketh/SaveForge";
 
 const CHECKING_UPDATES: &str = "Checking for plugin updates…";
 
