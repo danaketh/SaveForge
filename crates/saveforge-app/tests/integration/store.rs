@@ -2,14 +2,14 @@
 //! are not run: each test calls the store function itself and feeds the
 //! result back as the message the task would have produced.
 
-mod common;
+use crate::common;
 
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 
-use common::World;
+use crate::common::World;
 use iced_test::simulator;
 use saveforge_app::settings_form::SettingsField;
 use saveforge_app::store::{JobOutcome, progress_fraction, run_install};

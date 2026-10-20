@@ -70,7 +70,7 @@ Debug builds default to:
   - Slow work runs through the `blocking(...)` helper, or `job_task` for store jobs with progress.
   - Every background result carries a request number, and stale results are ignored.
 - **App tests:** tests drive `App::update` with hand-fed results; tasks are not executed. View tests use `iced_test::simulator`.
-- **Tests:** shared helpers are in each crate's `tests/common/mod.rs`. Real-save tests are `#[ignore]` and read their path from the environment.
+- **Tests:** a crate with several integration test files keeps them in one binary, `tests/integration/` (`main.rs` declares each file as a module), so it is linked once. Shared helpers are in `tests/integration/common/mod.rs`. Real-save tests are `#[ignore]` and read their path from the environment.
 - **The store treats catalog data as untrusted:**
   - `https://`/`file://` only, no redirect downgrade
   - an `https://` catalog may only list `https://` packages

@@ -1,6 +1,4 @@
-mod common;
-
-use common::World;
+use crate::common::World;
 use saveforge_app::documents::{DetectOutcome, Failure, detect_file, open_document};
 use saveforge_app::editor::{Editor, EditorEffect};
 use saveforge_app::render::UiMessage;

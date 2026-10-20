@@ -1,10 +1,8 @@
-mod common;
-
 use std::fs;
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 
-use common::{entry_for, manifest_json, package, sha256_hex};
+use crate::common::{entry_for, manifest_json, package, sha256_hex};
 use saveforge_store::install::{
     extract_zip, install, move_into_place, remove, remove_version, retry,
 };

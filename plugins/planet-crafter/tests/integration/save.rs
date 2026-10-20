@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use planet_crafter::save::{Item, Save, int};
 use serde_json::json;

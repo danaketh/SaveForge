@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use planet_crafter::format::{Object, SaveFile};
 use serde_json::{Map, Value, json};

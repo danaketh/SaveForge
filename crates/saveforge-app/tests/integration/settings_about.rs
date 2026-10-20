@@ -1,11 +1,9 @@
 //! Screens, navigation, the info bar, About and Settings.
 
-mod common;
-
 use std::fs;
 use std::path::Path;
 
-use common::World;
+use crate::common::World;
 use iced_test::simulator;
 use saveforge_app::documents::{DetectOutcome, detect_file, open_document};
 use saveforge_app::settings_form::{SettingsField, SettingsForm};

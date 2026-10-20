@@ -1,13 +1,13 @@
 //! A plugin installed from a `file://` catalog opens a save, end to end.
 
-mod common;
+use crate::common;
 
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{Cursor, Write};
 use std::path::Path;
 
-use common::World;
+use crate::common::World;
 use saveforge_app::documents::{DetectOutcome, detect_file, open_document};
 use saveforge_core::settings::file_url;
 use saveforge_host::{PluginEntry, PluginRegistry};

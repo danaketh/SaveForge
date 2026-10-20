@@ -1,7 +1,7 @@
 //! The release workflow publishes with a write token, so it must not run
 //! third-party code from movable tags or publish from manual runs.
 
-const RELEASE: &str = include_str!("../../.github/workflows/release.yml");
+const RELEASE: &str = include_str!("../../../.github/workflows/release.yml");
 
 #[test]
 fn release_token_is_read_only_by_default() {

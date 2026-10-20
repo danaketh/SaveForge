@@ -1,8 +1,6 @@
-mod common;
-
 use std::fs;
 
-use common::World;
+use crate::common::World;
 use saveforge_app::documents::{DetectOutcome, detect_file, lock, open_document, save_document};
 use saveforge_host::{Event, LoadedPlugin};
 use saveforge_plugin_api::ui::Widget;
