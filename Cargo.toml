@@ -52,7 +52,7 @@ ureq = { version = "3.4.2", default-features = false, features = [
     "rustls-no-provider",
     "platform-verifier",
 ] }
-wasmtime = { version = "49.0.3", default-features = false, features = [
+wasmtime = { version = "49.0.4", default-features = false, features = [
     "runtime",
     "cranelift",
     "component-model",
@@ -60,7 +60,7 @@ wasmtime = { version = "49.0.3", default-features = false, features = [
     "parallel-compilation",
     "cache",
 ] }
-wasmtime-wasi = "49.0.3"
+wasmtime-wasi = "49.0.4"
 winreg = "0.56.0"
 wit-bindgen = "0.62.0"
 zip = { version = "9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
