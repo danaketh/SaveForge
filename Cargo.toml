@@ -82,3 +82,25 @@ codegen-units = 1
 strip = true
 panic = "abort"
 opt-level = 3
+
+# Dev and test builds load plugins, and an unoptimized Cranelift makes each
+# load take seconds. Optimize only the crates that compile wasm; everything
+# else stays unoptimized for fast rebuilds.
+[profile.dev.package.cranelift-codegen]
+opt-level = 2
+[profile.dev.package.cranelift-frontend]
+opt-level = 2
+[profile.dev.package.cranelift-entity]
+opt-level = 2
+[profile.dev.package.cranelift-bforest]
+opt-level = 2
+[profile.dev.package.cranelift-assembler-x64]
+opt-level = 2
+[profile.dev.package.regalloc2]
+opt-level = 2
+[profile.dev.package.wasmtime-internal-cranelift]
+opt-level = 2
+[profile.dev.package.wasmtime-environ]
+opt-level = 2
+[profile.dev.package.wasmparser]
+opt-level = 2
