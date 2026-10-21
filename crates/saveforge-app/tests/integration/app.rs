@@ -2,12 +2,12 @@
 //! blocking function itself and feeds the result back as the message the task
 //! would have produced.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::World;
+use crate::common::World;
 use iced_test::simulator;
 use saveforge_app::documents::{DetectOutcome, Failure, detect_file, open_document};
 use saveforge_app::home::Saves;

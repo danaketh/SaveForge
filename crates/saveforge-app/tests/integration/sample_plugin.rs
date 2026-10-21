@@ -1,7 +1,7 @@
 //! End to end through the real `StardewLike` wasm component built by
 //! `cargo xtask plugins` into `target/dev-plugins`.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::{Path, PathBuf};

@@ -1,6 +1,6 @@
 //! Detection and opening, as the host calls them.
 
-mod common;
+use crate::common;
 
 use planet_crafter::document::INVENTORY;
 use planet_crafter::{LOCALIZATION_AUX, PRIORITY, PlanetCrafter};
@@ -85,7 +85,7 @@ fn unmodified_sample_serializes_byte_for_byte() {
 #[test]
 fn manifest_points_at_the_game_save_folder() {
     let manifest: serde_json::Value =
-        serde_json::from_str(include_str!("../manifest.json")).unwrap();
+        serde_json::from_str(include_str!("../../manifest.json")).unwrap();
     let dirs = &manifest["defaultSaveDirectories"];
     assert_eq!(
         dirs["windows"],

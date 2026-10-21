@@ -261,7 +261,7 @@ A path whose token can't be resolved (for example, Steam is not installed) is tr
 
 ## 7. Testing
 
-Plugins are ordinary crates, so `cargo test -p my-game` runs natively without the app. The scaffold's test opens a minimal save and checks the rendered fields. The existing plugins also round-trip the sample saves in `docs/sample-saves/`. Tests that need a real save read its path from an environment variable and are `#[ignore]`d by default: see `plugins/planet-crafter/tests/real_save.rs`.
+Plugins are ordinary crates, so `cargo test -p my-game` runs natively without the app. The scaffold's test opens a minimal save and checks the rendered fields. The existing plugins also round-trip the sample saves in `docs/sample-saves/`. Tests that need a real save read its path from an environment variable and are `#[ignore]`d by default: see `plugins/planet-crafter/tests/integration/real_save.rs`.
 
 ## 8. Packaging and publishing
 

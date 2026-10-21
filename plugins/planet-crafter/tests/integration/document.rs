@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use planet_crafter::document::{
     ALL_TIME_TOKENS_ID, CHARACTER, CRAFTED_OBJECTS_ID, DISPLAY_NAME_ID, EQUIPMENT, INVENTORY,
