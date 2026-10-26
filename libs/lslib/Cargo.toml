@@ -1,0 +1,19 @@
+[package]
+name = "lslib"
+description = "Larian Studios file formats (LSPK packages: .pak, .lsv savegames), ported from Norbyte's LSLib"
+license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+crc32fast.workspace = true
+flate2.workspace = true
+lz4_flex.workspace = true
+md5.workspace = true
+ruzstd.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
