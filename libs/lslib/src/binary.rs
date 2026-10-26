@@ -17,6 +17,15 @@ impl<'a> Reader<'a> {
         Self { data, pos: 0, what }
     }
 
+    /// Moves to absolute position `pos`; reads past the end fail later.
+    pub(crate) fn seek(&mut self, pos: usize) {
+        self.pos = pos;
+    }
+
+    pub(crate) fn remaining(&self) -> usize {
+        self.data.len().saturating_sub(self.pos)
+    }
+
     pub(crate) fn bytes(&mut self, len: usize) -> Result<&'a [u8]> {
         let bytes = slice(self.data, self.pos, len, self.what)?;
         self.pos += len;
@@ -43,6 +52,30 @@ impl<'a> Reader<'a> {
 
     pub(crate) fn u64(&mut self) -> Result<u64> {
         self.array().map(u64::from_le_bytes)
+    }
+
+    pub(crate) fn i8(&mut self) -> Result<i8> {
+        self.array().map(i8::from_le_bytes)
+    }
+
+    pub(crate) fn i16(&mut self) -> Result<i16> {
+        self.array().map(i16::from_le_bytes)
+    }
+
+    pub(crate) fn i32(&mut self) -> Result<i32> {
+        self.array().map(i32::from_le_bytes)
+    }
+
+    pub(crate) fn i64(&mut self) -> Result<i64> {
+        self.array().map(i64::from_le_bytes)
+    }
+
+    pub(crate) fn f32(&mut self) -> Result<f32> {
+        self.array().map(f32::from_le_bytes)
+    }
+
+    pub(crate) fn f64(&mut self) -> Result<f64> {
+        self.array().map(f64::from_le_bytes)
     }
 }
 

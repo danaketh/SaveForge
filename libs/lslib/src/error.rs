@@ -11,6 +11,8 @@ pub enum LslibError {
     Truncated(&'static str),
     #[error("invalid package: {0}")]
     InvalidPackage(String),
+    #[error("invalid LSF resource: {0}")]
+    InvalidLsf(String),
     #[error("unsupported compression method {0}")]
     UnsupportedCompression(u8),
     #[error("{method:?} decompression failed: {message}")]

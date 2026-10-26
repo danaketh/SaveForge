@@ -16,7 +16,7 @@ crates/saveforge-host/        # wasmtime engine, plugin loading, registry, detec
 crates/saveforge-store/       # catalog + cache, downloads, SHA-256, install/update/remove
 crates/saveforge-app/         # iced app (binary `saveforge`): screens, theme, renderer
 sdk/saveforge-sdk/            # guest SDK: Plugin/Document traits, ui builders, form helper, export_plugin!
-libs/lslib/                   # Larian formats (LSPK .pak/.lsv packages), pure Rust port of LSLib, wasm-safe
+libs/lslib/                   # Larian formats (LSPK .pak/.lsv packages, LSF resources), pure Rust port of LSLib, wasm-safe
 plugins/planet-crafter/       # Planet Crafter (custom view/update, lossless round-trip)
 plugins/sample-stardew/       # reference schema-driven plugin
 fixtures/test-plugin/         # component used by host/app tests

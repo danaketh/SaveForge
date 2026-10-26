@@ -131,6 +131,17 @@ pub fn decompress(data: &[u8], size: usize, method: CompressionMethod) -> Result
     }
 }
 
+/// Compresses `data` into an LZ4 frame (`LSLib`'s "chunked" LZ4).
+///
+/// # Panics
+///
+/// Never in practice: the encoder writes to memory.
+pub(crate) fn compress_lz4_frame(data: &[u8]) -> Vec<u8> {
+    let mut encoder = lz4_flex::frame::FrameEncoder::new(Vec::new());
+    encoder.write_all(data).expect("in-memory LZ4 write");
+    encoder.finish().expect("in-memory LZ4 finish")
+}
+
 /// Decompresses an LZ4 frame (the solid-archive format) to `size` bytes. A
 /// missing end mark is tolerated, as the frame may be cut at the last file.
 pub(crate) fn decompress_lz4_frame(data: &[u8], size: usize) -> Result<Vec<u8>> {
