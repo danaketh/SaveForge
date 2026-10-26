@@ -4,7 +4,7 @@ use lslib::lsf::{LsfFile, LsfFormat, LsfVersion, MetadataFormat};
 use lslib::package::Package;
 use lslib::resource::{
     Attribute, AttributeValue, Node, PackedVersion, Resource, TranslatedFSString,
-    TranslatedFSStringArgument, TranslatedString,
+    TranslatedFSStringArgument, TranslatedString, uuid_string,
 };
 
 const ALL_VERSIONS: [LsfVersion; 7] = [
@@ -214,6 +214,16 @@ fn node_helpers_find_and_edit() {
             .and_then(AttributeValue::as_str),
         Some("S_Player_Karlach")
     );
+}
+
+#[test]
+fn uuids_print_like_the_game() {
+    // GustavX's module UUID as stored in a BG3 save's meta.lsf.
+    let stored = [
+        0xfe, 0x5e, 0x55, 0xcb, 0x9e, 0x2d, 0x1f, 0x13, 0x95, 0x81, 0x93, 0xa8, 0xd2, 0x29, 0xea,
+        0x18,
+    ];
+    assert_eq!(uuid_string(&stored), "cb555efe-2d9e-131f-8195-a89329d218ea");
 }
 
 #[test]

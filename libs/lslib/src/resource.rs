@@ -308,6 +308,24 @@ impl AttributeValue {
     }
 }
 
+/// The text form of a stored UUID, as the game and `LSLib` print it: .NET
+/// GUID order (first three groups little-endian) with bytes 8..16 swapped in
+/// pairs, e.g. `GustavX`'s `cb555efe-2d9e-131f-8195-a89329d218ea`.
+pub fn uuid_string(bytes: &[u8; 16]) -> String {
+    use std::fmt::Write as _;
+    const ORDER: [usize; 16] = [3, 2, 1, 0, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14];
+    ORDER
+        .iter()
+        .enumerate()
+        .fold(String::with_capacity(36), |mut out, (i, &b)| {
+            if matches!(i, 4 | 6 | 8 | 10) {
+                out.push('-');
+            }
+            let _ = write!(out, "{:02x}", bytes[b]);
+            out
+        })
+}
+
 /// A localized string reference.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TranslatedString {
