@@ -8,6 +8,7 @@ members = [
     "crates/saveforge-store",
     "fixtures/test-plugin",
     "libs/lslib",
+    "plugins/bg3",
     "plugins/planet-crafter",
     "plugins/sample-stardew",
     "sdk/saveforge-sdk",
