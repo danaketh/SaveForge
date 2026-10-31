@@ -6,6 +6,7 @@ use iced::widget::{
     text_input, tooltip,
 };
 use iced::{Alignment, Element, Length};
+use saveforge_core::discovery::SaveGroup;
 use saveforge_host::PluginEntry;
 use time::UtcOffset;
 
@@ -124,8 +125,8 @@ impl App {
         match &self.home.saves {
             Saves::NotConfigured(_) => "path not set".to_owned(),
             Saves::Scanning => "scanning…".to_owned(),
-            Saves::Found(saves) if saves.len() == 1 => "1 save".to_owned(),
-            Saves::Found(saves) => format!("{} saves", saves.len()),
+            Saves::Found(_) if self.home.saves.count() == 1 => "1 save".to_owned(),
+            Saves::Found(_) => format!("{} saves", self.home.saves.count()),
         }
     }
 
@@ -185,15 +186,10 @@ impl App {
                 .push(text(reason.as_str()).size(12).style(theme::muted))
                 .push(button("Set path").on_press(Message::EditPath)),
             Saves::Scanning => col.push(text("Scanning…").style(theme::muted)),
-            Saves::Found(saves) if saves.is_empty() => col
+            Saves::Found(groups) if groups.is_empty() => col
                 .push(text("No saves found").style(theme::muted))
                 .push(button(text("Refresh").size(12)).on_press(Message::RefreshSaves)),
-            Saves::Found(saves) => {
-                let offset = self
-                    .services
-                    .as_ref()
-                    .map_or(UtcOffset::UTC, |s| s.local_offset);
-                let open_path = self.editor.as_ref().map(|e| &e.path);
+            Saves::Found(groups) => {
                 col = col.push(
                     row![
                         text(self.save_summary())
@@ -204,27 +200,71 @@ impl App {
                     ]
                     .align_y(Alignment::Center),
                 );
-                col.extend(saves.iter().map(|save| {
-                    button(
-                        column![
-                            text(save.file_name.as_str()),
-                            text(format!(
-                                "{} · {}",
-                                format_modified(save.modified, offset),
-                                human_size(save.size_bytes)
-                            ))
-                            .size(12)
-                            .style(theme::muted),
-                        ]
-                        .spacing(2),
-                    )
-                    .width(Length::Fill)
-                    .style(theme::save_row(open_path == Some(&save.path)))
-                    .on_press(Message::OpenSave(save.path.clone()))
-                    .into()
-                }))
+                self.save_list(col, groups)
             }
         }
+    }
+
+    /// The saves, under a foldable header per group when the plugin groups
+    /// them.
+    fn save_list<'a>(
+        &'a self,
+        mut col: Column<'a, Message>,
+        groups: &'a [SaveGroup],
+    ) -> Column<'a, Message> {
+        let offset = self
+            .services
+            .as_ref()
+            .map_or(UtcOffset::UTC, |s| s.local_offset);
+        let open_path = self.editor.as_ref().map(|e| &e.path);
+        let grouped = groups.iter().any(|g| g.name.is_some());
+        for group in groups {
+            if grouped {
+                let (name, key) = match &group.name {
+                    Some(name) => (name.as_str(), name.clone()),
+                    None => ("Other", String::new()),
+                };
+                let collapsed = self.home.collapsed.contains(&key);
+                col = col.push(
+                    button(
+                        row![
+                            text(if collapsed { "▸" } else { "▾" }),
+                            text(name).width(Length::Fill),
+                            text(group.saves.len()).size(12).style(theme::muted),
+                        ]
+                        .spacing(6)
+                        .align_y(Alignment::Center),
+                    )
+                    .width(Length::Fill)
+                    .style(theme::save_row(false))
+                    .on_press(Message::ToggleSaveGroup(key)),
+                );
+                if collapsed {
+                    continue;
+                }
+            }
+            col = col.extend(group.saves.iter().map(|save| {
+                let file = &save.file;
+                button(
+                    column![
+                        text(save.label.as_str()).size(14),
+                        text(format!(
+                            "{} · {}",
+                            format_modified(file.modified, offset),
+                            human_size(file.size_bytes)
+                        ))
+                        .size(12)
+                        .style(theme::muted),
+                    ]
+                    .spacing(2),
+                )
+                .width(Length::Fill)
+                .style(theme::save_row(open_path == Some(&file.path)))
+                .on_press(Message::OpenSave(file.path.clone()))
+                .into()
+            }));
+        }
+        col
     }
 
     fn path_editor<'a>(&'a self, editing: &'a str) -> Element<'a, Message> {

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use iced::{Subscription, Task, keyboard, window};
-use saveforge_core::discovery::{SaveFileInfo, discover};
+use saveforge_core::discovery::{SaveGroup, discover, group_saves};
 use saveforge_core::paths::AppPaths;
 use saveforge_core::platform::Os;
 use saveforge_core::settings::AppSettings;
@@ -88,9 +88,10 @@ pub enum Message {
     SelectPlugin(String),
     SavesFound {
         plugin_id: String,
-        saves: Vec<SaveFileInfo>,
+        saves: Vec<SaveGroup>,
     },
     RefreshSaves,
+    ToggleSaveGroup(String),
     EditPath,
     PathChanged(String),
     BrowsePath,
@@ -355,6 +356,12 @@ impl App {
                 Task::none()
             }
             Message::RefreshSaves => self.scan_saves(),
+            Message::ToggleSaveGroup(name) => {
+                if !self.home.collapsed.remove(&name) {
+                    self.home.collapsed.insert(name);
+                }
+                Task::none()
+            }
             Message::EditPath => {
                 self.home.editing = Some(self.home.raw_dir.clone().unwrap_or_default());
                 Task::none()
@@ -605,6 +612,7 @@ impl App {
             self.busy = None;
         }
         self.home.editing = None;
+        self.home.collapsed.clear();
         self.home.raw_dir = self
             .loaded_plugin(&id)
             .and_then(|p| raw_save_dir(&self.settings, &p.manifest, Os::current()));
@@ -627,8 +635,9 @@ impl App {
             Ok(dir) => {
                 self.home.saves = Saves::Scanning;
                 let extensions = plugin.manifest.file_extensions.clone();
+                let grouping = plugin.manifest.save_grouping.clone();
                 blocking(
-                    move || discover(&dir, &extensions),
+                    move || group_saves(discover(&dir, &extensions), grouping.as_ref()),
                     move |saves| Message::SavesFound {
                         plugin_id: id.clone(),
                         saves,
