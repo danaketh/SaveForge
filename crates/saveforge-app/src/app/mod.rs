@@ -5,6 +5,8 @@ mod settings_view;
 mod store_view;
 mod view;
 
+pub use view::{RAIL_ABOUT, RAIL_SETTINGS, RAIL_STORE};
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -126,6 +128,8 @@ pub enum Message {
     CloseRequested(window::Id),
     Navigate(Screen),
     DismissInfo,
+    /// Closes the status toast.
+    DismissStatus,
     OpenUrl(String),
     SettingsEdited(SettingsField, String),
     SettingsToggled(bool),
@@ -549,6 +553,10 @@ impl App {
             }
             Message::DismissInfo => {
                 self.info = None;
+                Task::none()
+            }
+            Message::DismissStatus => {
+                self.status = None;
                 Task::none()
             }
             Message::OpenUrl(url) => {
@@ -1123,6 +1131,12 @@ pub fn run() -> iced::Result {
         App::update,
         App::view,
     )
+    .settings(iced::Settings {
+        fonts: crate::fonts::files(),
+        default_font: crate::fonts::MONO,
+        default_text_size: iced::Pixels(13.0),
+        ..iced::Settings::default()
+    })
     .title(App::title)
     .theme(|_: &App| crate::theme::theme())
     .subscription(App::subscription)
