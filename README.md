@@ -4,7 +4,7 @@ SaveForge is a desktop app for editing save files of single-player games. Each g
 
 ## Requirements
 
-- Rust stable, 1.96 or newer (`rustup update stable`)
+- Rust stable, 1.97 or newer (`rustup update stable`)
 - The WebAssembly target for plugins: `rustup target add wasm32-wasip2`
 
 ## Build and run
@@ -84,7 +84,7 @@ cargo deny check
 cargo machete
 ```
 
-Lints are `clippy::pedantic` at `-D warnings`, and `unsafe_code` is forbidden. A separate CI job checks the workspace on Rust 1.96. A `v*` tag runs `.github/workflows/release.yml`, which publishes the app binaries, the plugin zips and `catalog.json`.
+Lints are `clippy::pedantic` at `-D warnings`, and `unsafe_code` is forbidden. A separate CI job checks the workspace on Rust 1.97. A `v*` tag runs `.github/workflows/release.yml`, which publishes the app binaries, the plugin zips and `catalog.json`.
 
 ## Project structure
 
