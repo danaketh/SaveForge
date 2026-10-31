@@ -188,15 +188,7 @@ impl App {
             .spacing(8)
             .padding(14)
             .into(),
-            (Plugins::Ready(_), Some(plugin)) => column![
-                plugin_header(plugin),
-                hline(),
-                self.folder_row(),
-                hline(),
-                self.saves_body(),
-            ]
-            .height(Length::Fill)
-            .into(),
+            (Plugins::Ready(_), Some(_)) => self.saves_body(),
         };
         container(body)
             .width(Length::Fixed(theme::PANEL_WIDTH))
@@ -390,7 +382,18 @@ impl App {
         }
     }
 
+    /// The selected game's title and save folder over the editor.
     fn home_pane(&self) -> Element<'_, Message> {
+        let body = self.home_body();
+        match self.selected_plugin() {
+            Some(plugin) => column![plugin_header(plugin), self.folder_row(), hline(), body]
+                .height(Length::Fill)
+                .into(),
+            None => body,
+        }
+    }
+
+    fn home_body(&self) -> Element<'_, Message> {
         let Some(editor) = &self.editor else {
             let hint = self
                 .busy
@@ -667,7 +670,7 @@ fn padded(content: Element<'_, Message>) -> Element<'_, Message> {
         .into()
 }
 
-/// The selected plugin's header in the saves pane.
+/// The selected plugin's header above the editor.
 fn plugin_header(plugin: &LoadedPlugin) -> Element<'_, Message> {
     container(
         row![
