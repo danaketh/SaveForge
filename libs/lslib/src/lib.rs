@@ -5,7 +5,9 @@
 //! - [`package`]: LSPK packages, the container of `.pak` game data and `.lsv`
 //!   savegames, in every version `LSLib` supports (v7 D:OS 1 through v18 BG3);
 //! - [`lsf`]: LSF binary resources (such as a save's `Globals.lsf`), read into
-//!   the [`resource`] tree.
+//!   the [`resource`] tree;
+//! - [`newage`]: the BG3 ECS blob in a save's `Globals.lsf` (character
+//!   stats and experience live there). Not part of `LSLib`.
 //!
 //! Everything works on byte slices so the crate runs inside a sandboxed
 //! plugin: the caller reads and writes the files.
@@ -33,6 +35,7 @@ mod binary;
 pub mod compression;
 mod error;
 pub mod lsf;
+pub mod newage;
 pub mod package;
 pub mod resource;
 

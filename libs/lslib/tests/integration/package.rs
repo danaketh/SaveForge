@@ -190,14 +190,27 @@ fn archive_hash_is_md5_plus_one() {
         hash
     };
 
-    // v15+ hash in file order, and only on request.
+    // v15+ hash sorted by lower-cased path, and only on request.
     let mut v18 = builder(PackageVersion::V18, CompressionMethod::Zlib);
     assert_eq!(Package::read(&v18.build().unwrap()).unwrap().md5(), [0; 16]);
     v18.hash = true;
-    assert_eq!(
-        Package::read(&v18.build().unwrap()).unwrap().md5(),
-        digest(&files)
-    );
+    let mut lower = files.clone();
+    lower.sort_by_key(|(path, _)| path.to_lowercase());
+    let hashed = v18.build().unwrap();
+    assert_eq!(Package::read(&hashed).unwrap().md5(), digest(&lower));
+
+    // A hashed package resaves with its hash; an unhashed one stays zero.
+    let package = Package::read(&hashed).unwrap();
+    let resaved = package.to_builder().unwrap().build().unwrap();
+    assert_eq!(Package::read(&resaved).unwrap().md5(), digest(&lower));
+    v18.hash = false;
+    let unhashed = Package::read(&v18.build().unwrap())
+        .unwrap()
+        .to_builder()
+        .unwrap()
+        .build()
+        .unwrap();
+    assert_eq!(Package::read(&unhashed).unwrap().md5(), [0; 16]);
 
     // Older versions always hash, sorted by path.
     let mut sorted = files.clone();
@@ -206,6 +219,49 @@ fn archive_hash_is_md5_plus_one() {
         .build()
         .unwrap();
     assert_eq!(Package::read(&v13).unwrap().md5(), digest(&sorted));
+}
+
+#[test]
+fn to_builder_reuses_stored_bytes_of_unchanged_files() {
+    let mut original = builder(PackageVersion::V18, CompressionMethod::Zlib);
+    original.hash = true;
+    let bytes = original.build().unwrap();
+    let package = Package::read(&bytes).unwrap();
+    let stored = |package: &Package<'_>, bytes: &[u8], name: &str| -> Vec<u8> {
+        let file = package.find(name).unwrap();
+        let start = usize::try_from(file.offset_in_file).unwrap();
+        bytes[start..start + usize::try_from(file.size_on_disk).unwrap()].to_vec()
+    };
+
+    let mut edited = package.to_builder().unwrap();
+    assert_ne!(edited.files[0].stored, None);
+    edited.set("meta.lsf", b"changed".to_vec());
+    assert_eq!(edited.files[2].stored, None);
+    let resaved = edited.build().unwrap();
+    let reread = Package::read(&resaved).unwrap();
+
+    // Unchanged files are copied byte for byte; the edited one is new.
+    for name in ["Globals.lsf", "LevelCache/WLD_Main_A.lsf"] {
+        assert_eq!(
+            stored(&reread, &resaved, name),
+            stored(&package, &bytes, name)
+        );
+        assert_eq!(
+            reread.find(name).unwrap().flags,
+            package.find(name).unwrap().flags
+        );
+    }
+    let meta = reread.find("meta.lsf").unwrap();
+    assert_eq!(&*reread.contents(meta).unwrap(), b"changed");
+    // The hash covers the new contents.
+    let mut expected = edited.clone();
+    for file in &mut expected.files {
+        file.stored = None;
+    }
+    assert_eq!(
+        reread.md5(),
+        Package::read(&expected.build().unwrap()).unwrap().md5()
+    );
 }
 
 #[test]
@@ -392,4 +448,6 @@ fn real_savegame_round_trips() {
     for (old, new) in package.files().iter().zip(reread.files()) {
         assert_eq!((&old.name, old.flags), (&new.name, new.flags));
     }
+    // The game checks this hash; an unchanged resave reproduces it.
+    assert_eq!(reread.md5(), package.md5());
 }

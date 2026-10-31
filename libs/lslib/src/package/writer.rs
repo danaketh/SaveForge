@@ -1,5 +1,7 @@
 //! Writing LSPK packages (`LSLib` `PackageWriter.cs`).
 
+use std::borrow::Cow;
+
 use md5::{Digest, Md5};
 
 use super::format::{Entry, EntryLayout, Header, HeaderLayout, SIGNATURE};
@@ -19,6 +21,11 @@ pub struct InputFile {
     pub data: Vec<u8>,
     /// Overrides the builder's compression for this file.
     pub compression: Option<(CompressionMethod, CompressionLevel)>,
+    /// `data` already compressed with `compression`, written as is instead
+    /// of compressing again. [`super::Package::to_builder`] fills it in, and
+    /// [`PackageBuilder::set`] clears it, so resaving an edited package only
+    /// compresses the files that changed.
+    pub stored: Option<Vec<u8>>,
 }
 
 /// Builds a package in memory. Packages that would need more than one archive
@@ -65,6 +72,7 @@ impl PackageBuilder {
             path: path.into(),
             data,
             compression: None,
+            stored: None,
         });
         self
     }
@@ -77,7 +85,10 @@ impl PackageBuilder {
             .iter_mut()
             .find(|f| f.path.eq_ignore_ascii_case(path))
         {
-            Some(file) => file.data = data,
+            Some(file) => {
+                file.data = data;
+                file.stored = None;
+            }
             None => {
                 self.add(path, data);
             }
@@ -202,8 +213,15 @@ impl PackageBuilder {
         self.files
             .iter()
             .map(|file| {
-                let (method, level) = self.compression_for(file);
-                let stored = compression::compress(&file.data, method, level);
+                let (method, level, stored) = if let (Some(stored), Some((method, level))) =
+                    (&file.stored, file.compression)
+                {
+                    (method, level, Cow::Borrowed(stored.as_slice()))
+                } else {
+                    let (method, level) = self.compression_for(file);
+                    let stored = compression::compress(&file.data, method, level);
+                    (method, level, Cow::Owned(stored))
+                };
 
                 let offset = out.len() as u64;
                 if offset + stored.len() as u64 > self.version.max_package_size() {
@@ -285,12 +303,15 @@ impl PackageBuilder {
         Ok(())
     }
 
-    /// MD5 over the uncompressed contents of every file (sorted by path before
-    /// v15), with every byte incremented by one.
+    /// MD5 over the uncompressed contents of every file, with every byte
+    /// incremented by one. Files are sorted by path before v15, and by
+    /// lower-cased path from v15 on (what BG3 writes into savegames).
     fn archive_hash(&self) -> [u8; 16] {
         let mut files: Vec<&InputFile> = self.files.iter().collect();
         if self.version < PackageVersion::V15 {
             files.sort_by(|a, b| a.path.cmp(&b.path));
+        } else {
+            files.sort_by_cached_key(|f| f.path.to_lowercase());
         }
         let mut md5 = Md5::new();
         for file in files {

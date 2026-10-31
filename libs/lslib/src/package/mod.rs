@@ -267,6 +267,16 @@ impl<'a> Package<'a> {
         compression::decompress(stored, size, method).map(Cow::Owned)
     }
 
+    /// The bytes of `file` as stored on disk, when they can be written back
+    /// unchanged (not for solid archives).
+    fn stored(&self, file: &PackagedFile) -> Option<&[u8]> {
+        if self.solid.is_some() {
+            return None;
+        }
+        let part = self.parts.get(usize::try_from(file.archive_part).ok()?)?;
+        slice64(part, file.offset_in_file, file.size_on_disk, "file data").ok()
+    }
+
     /// Every file (deletion markers excluded) with its contents, in package
     /// order.
     pub fn extract_all(&self) -> Result<Vec<(String, Vec<u8>)>> {
@@ -281,11 +291,11 @@ impl<'a> Package<'a> {
     /// solid, which cannot be written), priority and files, each keeping its
     /// compression.
     ///
-    /// The v15+ archive hash is left out (zeros), as `LSLib` does when
-    /// resaving: the hash BG3 writes into savegames is not `LSLib`'s MD5
-    /// scheme, so it cannot be reproduced.
+    /// A v15+ archive hash is recomputed when this package has one, so a
+    /// resaved BG3 savegame passes the game's integrity check.
     pub fn to_builder(&self) -> Result<PackageBuilder> {
         let mut builder = PackageBuilder::new(self.version);
+        builder.hash = self.md5 != [0; 16];
         builder.flags = PackageFlags(self.flags.0 & !PackageFlags::SOLID.0);
         builder.priority = self.priority;
         for file in self.files.iter().filter(|f| !f.is_deletion()) {
@@ -294,6 +304,7 @@ impl<'a> Package<'a> {
                 path: file.name.clone(),
                 data: self.contents(file)?.into_owned(),
                 compression: Some(compression),
+                stored: self.stored(file).map(<[u8]>::to_vec),
             });
         }
         Ok(builder)
