@@ -1,22 +1,27 @@
 //! The Settings and About screens (spec §5.2).
 
-use iced::widget::{Column, button, checkbox, column, row, scrollable, text, text_input};
-use iced::{Alignment, Element, Length};
+use iced::widget::{Column, checkbox, column, container, row, scrollable, space, text, text_input};
+use iced::{Alignment, Element, Length, Padding};
 use saveforge_host::{HOST_VERSION, WASMTIME_VERSION};
 use saveforge_plugin_api::API_VERSION;
 
 use super::{App, Message, REPOSITORY_URL};
+use crate::components::{Size, btn, caption, hline, panel_title, section_title};
+use crate::fonts;
+use crate::icons::Icon;
 use crate::settings_form::SettingsField;
 use crate::theme;
 
 /// The main components and their licences, shown in About.
-const LICENCES: [(&str, &str); 6] = [
+const LICENCES: [(&str, &str); 8] = [
     ("iced", "MIT"),
     ("wasmtime", "Apache-2.0 WITH LLVM-exception"),
     ("rustls", "Apache-2.0 OR ISC OR MIT"),
     ("ureq", "MIT OR Apache-2.0"),
     ("zip", "MIT"),
     ("serde / serde_json", "MIT OR Apache-2.0"),
+    ("JetBrains Mono (font)", "OFL-1.1"),
+    ("VT323 (font)", "OFL-1.1"),
 ];
 
 const LINKS: [(&str, &str); 3] = [
@@ -25,33 +30,49 @@ const LINKS: [(&str, &str); 3] = [
     ("wasmtime", "https://wasmtime.dev"),
 ];
 
+/// Width of the label column, as in the editor's field rows.
+const LABEL_WIDTH: f32 = 180.0;
+
 pub(super) fn about<'a>() -> Element<'a, Message> {
     let links = row(LINKS.iter().map(|(label, url)| {
-        button(text(*label).size(13))
-            .style(button::secondary)
+        btn(label, None, Size::Small)
             .on_press(Message::OpenUrl((*url).to_owned()))
             .into()
     }))
     .spacing(8);
     let licences = Column::with_children(LICENCES.iter().map(|(name, licence)| {
-        row![
-            text(*name).width(Length::Fixed(180.0)),
-            text(*licence).style(theme::muted),
+        column![
+            row![
+                text(*name).size(12).width(Length::Fixed(LABEL_WIDTH)),
+                text(*licence).size(12).style(theme::muted),
+            ],
+            hline(),
         ]
+        .spacing(8)
         .into()
     }))
-    .spacing(4);
+    .spacing(8);
     scrollable(
         column![
-            text(format!("SaveForge {}", *HOST_VERSION)).size(22),
-            text(format!("wasmtime {WASMTIME_VERSION}")).style(theme::muted),
-            text(format!("Plugin API {API_VERSION}")).style(theme::muted),
+            panel_title("About"),
+            hline(),
+            text(format!("SaveForge {}", *HOST_VERSION))
+                .size(28)
+                .font(fonts::PIXEL),
+            column![
+                caption(format!("wasmtime {WASMTIME_VERSION}")),
+                caption(format!("Plugin API {API_VERSION}")),
+            ]
+            .spacing(4),
             links,
-            text("Open-source components").size(16),
+            container(section_title("Open-source components", None))
+                .padding(Padding::new(0.0).top(12)),
             licences,
         ]
-        .spacing(12),
+        .spacing(12)
+        .max_width(640),
     )
+    .style(theme::scroll)
     .into()
 }
 
@@ -61,64 +82,107 @@ impl App {
         let errors = Column::with_children(
             form.errors
                 .iter()
-                .map(|e| text(e.as_str()).style(theme::error_text).into()),
+                .map(|e| text(e.as_str()).size(11).style(theme::error_text).into()),
         )
         .spacing(4);
         scrollable(
             column![
-                text("Settings").size(22),
+                panel_title("Settings"),
+                hline(),
+                container(section_title("Catalog", None)).padding(Padding::new(0.0).top(8)),
                 labelled(
                     "Catalog URL",
+                    None,
                     text_input("https://…/catalog.json", &form.catalog_url)
+                        .size(12)
+                        .padding([6, 10])
+                        .style(theme::input)
                         .on_input(|v| Message::SettingsEdited(SettingsField::CatalogUrl, v))
                         .into(),
                 ),
+                labelled(
+                    "Updates",
+                    None,
+                    checkbox(form.check_updates_on_startup)
+                        .label("Check for plugin updates on startup")
+                        .size(16)
+                        .text_size(12)
+                        .style(theme::check)
+                        .on_toggle(Message::SettingsToggled)
+                        .into(),
+                ),
+                container(section_title("Folders", None)).padding(Padding::new(0.0).top(16)),
                 directory(
                     "Plugin directory",
+                    Some("Takes effect after restart."),
                     SettingsField::PluginDirectory,
                     &form.plugin_directory
                 ),
-                text("Takes effect after restart.")
-                    .size(12)
-                    .style(theme::muted),
                 directory(
                     "Backup directory",
+                    None,
                     SettingsField::BackupDirectory,
                     &form.backup_directory
                 ),
-                checkbox(form.check_updates_on_startup)
-                    .label("Check for plugin updates on startup")
-                    .on_toggle(Message::SettingsToggled),
                 errors,
                 row![
-                    button("Save").on_press(Message::SaveSettings),
-                    button("Check now")
-                        .style(button::secondary)
+                    space::horizontal(),
+                    btn("Check now", Some(Icon::Refresh), Size::Normal)
                         .on_press(Message::CheckUpdatesNow),
+                    btn("Save", Some(Icon::Save), Size::Normal)
+                        .style(theme::btn_primary)
+                        .on_press(Message::SaveSettings),
                 ]
-                .spacing(8),
+                .spacing(8)
+                .padding(Padding::new(0.0).top(8)),
             ]
-            .spacing(12)
-            .max_width(640),
+            .spacing(8)
+            .max_width(720),
         )
+        .style(theme::scroll)
         .into()
     }
 }
 
-fn labelled<'a>(label: &'a str, input: Element<'a, Message>) -> Element<'a, Message> {
-    column![text(label).size(13).style(theme::muted), input]
-        .spacing(4)
-        .into()
+/// A `.field` row: label (and hint) left, input right, hairline below.
+fn labelled<'a>(
+    label: &'a str,
+    hint: Option<&'a str>,
+    input: Element<'a, Message>,
+) -> Element<'a, Message> {
+    let mut left = column![text(label).size(11).style(theme::muted)].spacing(2);
+    if let Some(hint) = hint {
+        left = left.push(text(hint).size(10).style(theme::faint));
+    }
+    column![
+        row![left.width(Length::Fixed(LABEL_WIDTH)), input]
+            .spacing(16)
+            .align_y(Alignment::Center),
+        hline(),
+    ]
+    .spacing(10)
+    .padding(Padding::new(0.0).top(4))
+    .into()
 }
 
-fn directory<'a>(label: &'a str, field: SettingsField, value: &'a str) -> Element<'a, Message> {
+fn directory<'a>(
+    label: &'a str,
+    hint: Option<&'a str>,
+    field: SettingsField,
+    value: &'a str,
+) -> Element<'a, Message> {
     labelled(
         label,
+        hint,
         row![
             text_input("", value)
+                .size(12)
+                .padding([6, 10])
+                .style(theme::input)
                 .on_input(move |v| Message::SettingsEdited(field, v))
                 .width(Length::Fill),
-            button(text("Browse…").size(12)).on_press(Message::BrowseSettingsDir(field)),
+            btn("Browse…", Some(Icon::Folder), Size::Normal)
+                .on_press(Message::BrowseSettingsDir(field)),
         ]
         .spacing(6)
         .align_y(Alignment::Center)

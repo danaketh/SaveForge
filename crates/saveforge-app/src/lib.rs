@@ -1,10 +1,13 @@
 //! The `SaveForge` desktop app (spec §5).
 
 mod app;
+pub mod components;
 pub mod documents;
 pub mod editor;
+pub mod fonts;
 pub mod format;
 pub mod home;
+pub mod icons;
 pub mod logging;
 pub mod render;
 pub mod settings_form;
@@ -13,3 +16,4 @@ pub mod theme;
 pub mod ui_state;
 
 pub use app::{App, Message, Modal, Pending, Plugins, REPOSITORY_URL, Screen, Services, run};
+pub use app::{RAIL_ABOUT, RAIL_SETTINGS, RAIL_STORE};

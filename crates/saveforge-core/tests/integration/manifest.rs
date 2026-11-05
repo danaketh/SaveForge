@@ -2,7 +2,8 @@ use std::path::Path;
 
 use saveforge_core::CoreError;
 use saveforge_core::manifest::{
-    AUX_MAX_BYTES_CAP, DEFAULT_AUX_MAX_BYTES, PluginManifest, is_safe_relative_path, is_valid_id,
+    AUX_MAX_BYTES_CAP, DEFAULT_AUX_MAX_BYTES, GroupingSource, PluginManifest,
+    is_safe_relative_path, is_valid_id,
 };
 use saveforge_core::platform::Os;
 use semver::Version;
@@ -242,5 +243,35 @@ fn load_reads_manifest_from_dir() {
     assert!(matches!(
         PluginManifest::load(empty.path()),
         Err(CoreError::Io { .. })
+    ));
+}
+
+#[test]
+fn save_grouping_is_optional_and_parsed() {
+    assert_eq!(PluginManifest::parse(VALID).unwrap().save_grouping, None);
+    let m = PluginManifest::parse(&with(
+        "saveGrouping",
+        json!({ "match": "directory", "pattern": "^(?<group>.+)-\\d+__(?<name>.+)$" }),
+    ))
+    .unwrap();
+    let grouping = m.save_grouping.unwrap();
+    assert_eq!(grouping.source, GroupingSource::Directory);
+    assert_eq!(grouping.pattern, r"^(?<group>.+)-\d+__(?<name>.+)$");
+}
+
+#[test]
+fn save_grouping_rules() {
+    // Unknown match source, invalid pattern, no `group` capture.
+    assert_manifest_err(&with(
+        "saveGrouping",
+        json!({ "match": "folder", "pattern": "(?<group>.+)" }),
+    ));
+    assert_manifest_err(&with(
+        "saveGrouping",
+        json!({ "match": "file", "pattern": "(?<group>" }),
+    ));
+    assert_manifest_err(&with(
+        "saveGrouping",
+        json!({ "match": "file", "pattern": "(?<name>.+)" }),
     ));
 }

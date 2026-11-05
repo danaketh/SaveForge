@@ -1,9 +1,10 @@
 //! Home screen state: which plugin is selected and where its saves are
 //! (spec §5.2 Home).
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
-use saveforge_core::discovery::SaveFileInfo;
+use saveforge_core::discovery::SaveGroup;
 use saveforge_core::manifest::PluginManifest;
 use saveforge_core::platform::Os;
 use saveforge_core::settings::AppSettings;
@@ -14,7 +15,19 @@ pub enum Saves {
     /// No usable folder; the reason is shown to the user.
     NotConfigured(String),
     Scanning,
-    Found(Vec<SaveFileInfo>),
+    /// Grouped as the manifest's `saveGrouping` says; see
+    /// [`saveforge_core::discovery::group_saves`].
+    Found(Vec<SaveGroup>),
+}
+
+impl Saves {
+    /// Number of saves found, across all groups.
+    pub fn count(&self) -> usize {
+        match self {
+            Self::Found(groups) => groups.iter().map(|g| g.saves.len()).sum(),
+            Self::NotConfigured(_) | Self::Scanning => 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -25,6 +38,8 @@ pub struct Home {
     pub saves: Saves,
     /// `Some(text)` while the path editor is open.
     pub editing: Option<String>,
+    /// Names of the save groups the user folded away.
+    pub collapsed: HashSet<String>,
 }
 
 impl Default for Home {
@@ -34,6 +49,7 @@ impl Default for Home {
             raw_dir: None,
             saves: Saves::NotConfigured("No plugin selected".to_owned()),
             editing: None,
+            collapsed: HashSet::new(),
         }
     }
 }

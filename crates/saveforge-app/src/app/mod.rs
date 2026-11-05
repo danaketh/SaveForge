@@ -5,11 +5,13 @@ mod settings_view;
 mod store_view;
 mod view;
 
+pub use view::{RAIL_ABOUT, RAIL_SETTINGS, RAIL_STORE};
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use iced::{Subscription, Task, keyboard, window};
-use saveforge_core::discovery::{SaveFileInfo, discover};
+use saveforge_core::discovery::{SaveGroup, discover, group_saves};
 use saveforge_core::paths::AppPaths;
 use saveforge_core::platform::Os;
 use saveforge_core::settings::AppSettings;
@@ -88,9 +90,10 @@ pub enum Message {
     SelectPlugin(String),
     SavesFound {
         plugin_id: String,
-        saves: Vec<SaveFileInfo>,
+        saves: Vec<SaveGroup>,
     },
     RefreshSaves,
+    ToggleSaveGroup(String),
     EditPath,
     PathChanged(String),
     BrowsePath,
@@ -125,6 +128,8 @@ pub enum Message {
     CloseRequested(window::Id),
     Navigate(Screen),
     DismissInfo,
+    /// Closes the status toast.
+    DismissStatus,
     OpenUrl(String),
     SettingsEdited(SettingsField, String),
     SettingsToggled(bool),
@@ -355,6 +360,12 @@ impl App {
                 Task::none()
             }
             Message::RefreshSaves => self.scan_saves(),
+            Message::ToggleSaveGroup(name) => {
+                if !self.home.collapsed.remove(&name) {
+                    self.home.collapsed.insert(name);
+                }
+                Task::none()
+            }
             Message::EditPath => {
                 self.home.editing = Some(self.home.raw_dir.clone().unwrap_or_default());
                 Task::none()
@@ -544,6 +555,10 @@ impl App {
                 self.info = None;
                 Task::none()
             }
+            Message::DismissStatus => {
+                self.status = None;
+                Task::none()
+            }
             Message::OpenUrl(url) => {
                 // Links can come from a catalog: anything but https:// could
                 // start a local program or protocol handler.
@@ -605,6 +620,7 @@ impl App {
             self.busy = None;
         }
         self.home.editing = None;
+        self.home.collapsed.clear();
         self.home.raw_dir = self
             .loaded_plugin(&id)
             .and_then(|p| raw_save_dir(&self.settings, &p.manifest, Os::current()));
@@ -627,8 +643,9 @@ impl App {
             Ok(dir) => {
                 self.home.saves = Saves::Scanning;
                 let extensions = plugin.manifest.file_extensions.clone();
+                let grouping = plugin.manifest.save_grouping.clone();
                 blocking(
-                    move || discover(&dir, &extensions),
+                    move || group_saves(discover(&dir, &extensions), grouping.as_ref()),
                     move |saves| Message::SavesFound {
                         plugin_id: id.clone(),
                         saves,
@@ -1114,6 +1131,12 @@ pub fn run() -> iced::Result {
         App::update,
         App::view,
     )
+    .settings(iced::Settings {
+        fonts: crate::fonts::files(),
+        default_font: crate::fonts::MONO,
+        default_text_size: iced::Pixels(13.0),
+        ..iced::Settings::default()
+    })
     .title(App::title)
     .theme(|_: &App| crate::theme::theme())
     .subscription(App::subscription)

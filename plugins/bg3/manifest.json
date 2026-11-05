@@ -1,0 +1,21 @@
+{
+  "id": "bg3",
+  "name": "Baldur's Gate 3 Save Editor",
+  "version": "0.1.0",
+  "author": "SaveForge Team",
+  "description": "Edit ability scores and experience in Baldur's Gate 3 saves.",
+  "apiVersion": "0.1",
+  "minHostVersion": "0.1.0",
+  "maxHostVersion": null,
+  "component": "plugin.wasm",
+  "fileExtensions": [".lsv"],
+  "defaultSaveDirectories": {
+    "windows": "%LOCALAPPDATA%/Larian Studios/Baldur's Gate 3/PlayerProfiles/Public/Savegames/Story",
+    "linux": "{steam_compat:1086940}/AppData/Local/Larian Studios/Baldur's Gate 3/PlayerProfiles/Public/Savegames/Story",
+    "macos": "~/Documents/Larian Studios/Baldur's Gate 3/PlayerProfiles/Public/Savegames/Story"
+  },
+  "saveGrouping": {
+    "match": "directory",
+    "pattern": "^(?<group>.+)-\\d+__(?<name>.+)$"
+  }
+}
