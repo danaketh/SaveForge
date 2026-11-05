@@ -2,6 +2,7 @@
 
 mod app;
 mod common;
+mod components;
 mod documents;
 mod editor;
 mod format;

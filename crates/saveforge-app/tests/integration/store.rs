@@ -703,13 +703,36 @@ fn opening_a_save_of_a_plugin_being_removed_is_refused() {
 
 #[test]
 fn danger_buttons_have_readable_text() {
-    use iced::Background;
     use iced::widget::button;
+    use iced::{Background, Color};
     use saveforge_app::theme;
 
-    let style = theme::danger_button(&theme::theme(), button::Status::Active);
-    assert_eq!(style.text_color, theme::TEXT);
-    assert_eq!(style.background, Some(Background::Color(theme::RED)));
-    let disabled = theme::danger_button(&theme::theme(), button::Status::Disabled);
-    assert_eq!(disabled.text_color, theme::TEXT_FAINT);
+    // WCAG relative luminance and contrast ratio.
+    fn luminance(c: Color) -> f32 {
+        let lin = |v: f32| {
+            if v <= 0.039_28 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+    }
+    fn contrast(a: Color, b: Color) -> f32 {
+        let (hi, lo) = {
+            let (x, y) = (luminance(a), luminance(b));
+            if x > y { (x, y) } else { (y, x) }
+        };
+        (hi + 0.05) / (lo + 0.05)
+    }
+
+    let style = theme::btn_danger(&theme::theme(), button::Status::Active);
+    assert_eq!(style.text_color, theme::RED_TEXT);
+    let Some(Background::Color(background)) = style.background else {
+        panic!("danger button has no solid background");
+    };
+    let ratio = contrast(style.text_color, background);
+    assert!(ratio >= 4.5, "contrast {ratio}");
+    let disabled = theme::btn_danger(&theme::theme(), button::Status::Disabled);
+    assert!(disabled.text_color.a < style.text_color.a);
 }

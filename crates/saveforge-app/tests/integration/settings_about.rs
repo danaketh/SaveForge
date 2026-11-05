@@ -4,10 +4,11 @@ use std::fs;
 use std::path::Path;
 
 use crate::common::World;
+use iced::widget::Id;
 use iced_test::simulator;
 use saveforge_app::documents::{DetectOutcome, detect_file, open_document};
 use saveforge_app::settings_form::{SettingsField, SettingsForm};
-use saveforge_app::{App, Message, Screen};
+use saveforge_app::{App, Message, RAIL_ABOUT, RAIL_SETTINGS, RAIL_STORE, Screen};
 use saveforge_core::paths::AppPaths;
 use saveforge_core::settings::AppSettings;
 use saveforge_host::{HOST_VERSION, WASMTIME_VERSION};
@@ -136,9 +137,10 @@ fn rail_has_store_settings_and_about() {
     let world = World::new();
     let app = ready_app(&world);
     let mut ui = simulator(app.view());
-    let _ = ui.click("Store");
-    let _ = ui.click("Settings");
-    let _ = ui.click("About");
+    // The rail tools show icons only; they are found by widget id.
+    for id in [RAIL_STORE, RAIL_SETTINGS, RAIL_ABOUT] {
+        let _ = ui.click(Id::new(id));
+    }
     let messages: Vec<Message> = ui.into_messages().collect();
     for screen in [Screen::Store, Screen::Settings, Screen::About] {
         assert!(
