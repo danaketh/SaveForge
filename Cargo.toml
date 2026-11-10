@@ -18,7 +18,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.96"
+rust-version = "1.97"
 publish = false
 
 [workspace.dependencies]
@@ -52,7 +52,7 @@ sha2 = "0.11.1"
 tempfile = "3.27.0"
 thiserror = "2.0.21"
 time = { version = "0.3.55", features = ["formatting", "macros"] }
-tokio = { version = "1.53.2", default-features = false }
+tokio = { version = "1.53.3", default-features = false }
 tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-subscriber = "0.3.23"
@@ -60,7 +60,7 @@ ureq = { version = "3.4.2", default-features = false, features = [
     "rustls-no-provider",
     "platform-verifier",
 ] }
-wasmtime = { version = "49.0.4", default-features = false, features = [
+wasmtime = { version = "50.0.1", default-features = false, features = [
     "runtime",
     "cranelift",
     "component-model",
@@ -68,7 +68,7 @@ wasmtime = { version = "49.0.4", default-features = false, features = [
     "parallel-compilation",
     "cache",
 ] }
-wasmtime-wasi = "49.0.4"
+wasmtime-wasi = "50.0.1"
 winreg = "0.56.0"
 wit-bindgen = "0.62.0"
 zip = { version = "9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
@@ -90,3 +90,25 @@ codegen-units = 1
 strip = true
 panic = "abort"
 opt-level = 3
+
+# Dev and test builds load plugins, and an unoptimized Cranelift makes each
+# load take seconds. Optimize only the crates that compile wasm; everything
+# else stays unoptimized for fast rebuilds.
+[profile.dev.package.cranelift-codegen]
+opt-level = 2
+[profile.dev.package.cranelift-frontend]
+opt-level = 2
+[profile.dev.package.cranelift-entity]
+opt-level = 2
+[profile.dev.package.cranelift-bforest]
+opt-level = 2
+[profile.dev.package.cranelift-assembler-x64]
+opt-level = 2
+[profile.dev.package.regalloc2]
+opt-level = 2
+[profile.dev.package.wasmtime-internal-cranelift]
+opt-level = 2
+[profile.dev.package.wasmtime-environ]
+opt-level = 2
+[profile.dev.package.wasmparser]
+opt-level = 2

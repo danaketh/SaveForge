@@ -52,7 +52,7 @@ The quality gate (CI):
 - the wasm clippy line in `.github/workflows/ci.yml`
 - `cargo test --workspace`, `cargo deny check`, `cargo machete`
 
-MSRV is 1.96 and is checked in CI.
+MSRV is 1.97 and is checked in CI.
 
 ## Dev mode
 
