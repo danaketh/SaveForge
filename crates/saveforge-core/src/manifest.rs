@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
+use regex_lite::Regex;
 use semver::Version;
 use serde::Deserialize;
 
@@ -34,6 +35,8 @@ pub struct PluginManifest {
     pub default_save_directories: DefaultSaveDirectories,
     #[serde(default)]
     pub aux_files: Vec<AuxFileSpec>,
+    #[serde(default)]
+    pub save_grouping: Option<SaveGrouping>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
@@ -65,6 +68,38 @@ pub struct AuxFileSpec {
     #[serde(default = "default_aux_max_bytes")]
     pub max_bytes: u64,
     pub candidates: Vec<String>,
+}
+
+/// How the save list groups saves, such as by character (spec §5.2 Home).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct SaveGrouping {
+    #[serde(rename = "match")]
+    pub source: GroupingSource,
+    /// Matched against [`GroupingSource`]'s text. The named capture `group`
+    /// names the save's group; an optional `name` capture is its label.
+    pub pattern: String,
+}
+
+/// The text a [`SaveGrouping`] pattern is matched against.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GroupingSource {
+    /// The name of the folder holding the save.
+    Directory,
+    /// The save's file name without its extension.
+    File,
+}
+
+impl SaveGrouping {
+    /// The compiled pattern; fails when it is invalid or has no `group` capture.
+    pub fn regex(&self) -> Result<Regex> {
+        let regex = Regex::new(&self.pattern)
+            .map_err(|e| invalid(format!("saveGrouping pattern is invalid: {e}")))?;
+        if !regex.capture_names().any(|name| name == Some("group")) {
+            return Err(invalid("saveGrouping pattern has no named capture 'group'"));
+        }
+        Ok(regex)
+    }
 }
 
 fn default_aux_max_bytes() -> u64 {
@@ -172,6 +207,9 @@ impl PluginManifest {
             if aux.candidates.is_empty() {
                 return Err(invalid(format!("auxFiles '{}' has no candidates", aux.id)));
             }
+        }
+        if let Some(grouping) = &self.save_grouping {
+            grouping.regex()?;
         }
         Ok(())
     }

@@ -66,6 +66,11 @@ The app checks these rules when it loads a plugin and when it installs one:
 - `fileExtensions` is non-empty. Each entry starts with `.` and is compared case-insensitively.
 - `defaultSaveDirectories` gives a starting folder per OS. A missing key or `null` means no default. The user can always set the folder in the app.
 - `auxFiles[].id` values are unique. `maxBytes` defaults to 8 MB and is capped at 64 MB.
+- `saveGrouping` (optional) groups the save list, for example by character. `match` is `directory` (the name of the folder holding the save) or `file` (the file name without its extension). `pattern` is a regex matched against that text; its named capture `group` names the group and must exist, and an optional `name` capture labels the save instead of its file name. Groups are ordered by their newest save; saves the pattern does not match are listed last under "Other". From `plugins/bg3/manifest.json`, where save folders look like `Tav-1234__Goblin Camp`:
+
+  ```json
+  "saveGrouping": { "match": "directory", "pattern": "^(?<group>.+)-\\d+__(?<name>.+)$" }
+  ```
 
 ## 3. The `Plugin` trait
 

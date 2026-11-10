@@ -3,7 +3,8 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use filetime::{FileTime, set_file_mtime};
-use saveforge_core::discovery::discover;
+use saveforge_core::discovery::{discover, group_saves};
+use saveforge_core::manifest::{GroupingSource, SaveGrouping};
 
 fn json() -> Vec<String> {
     vec![".json".to_owned()]
@@ -81,4 +82,78 @@ fn does_not_follow_symlinked_dirs() {
     touch(&dir.path().join("sub/a.json"), b"", 1);
     std::os::unix::fs::symlink(dir.path(), dir.path().join("sub/loop")).unwrap();
     assert_eq!(discover(dir.path(), &json()).len(), 1);
+}
+
+fn bg3_grouping() -> SaveGrouping {
+    SaveGrouping {
+        source: GroupingSource::Directory,
+        pattern: r"^(?<group>.+)-\d+__(?<name>.+)$".to_owned(),
+    }
+}
+
+/// `(group, [labels])` per group, in order.
+fn summary(groups: &[saveforge_core::discovery::SaveGroup]) -> Vec<(Option<&str>, Vec<&str>)> {
+    groups
+        .iter()
+        .map(|g| {
+            (
+                g.name.as_deref(),
+                g.saves.iter().map(|s| s.label.as_str()).collect(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn groups_by_folder_name_newest_group_first() {
+    let dir = tempfile::tempdir().unwrap();
+    let save = |folder: &str, file: &str, secs| {
+        touch(&dir.path().join(folder).join(file), b"x", secs);
+    };
+    save("Tav-1__QuickSave_1", "QuickSave_1.lsv", 1_000);
+    save("Shadow-Heart-22__Camp - 1h 02m", "Camp - 1h 02m.lsv", 3_000);
+    save("Tav-333__Goblin Camp", "Goblin Camp.lsv", 2_000);
+    save("Shadow-Heart-4__AutoSave_0", "AutoSave_0.lsv", 500);
+    save("loose", "Odd.lsv", 4_000);
+
+    let lsv = vec![".lsv".to_owned()];
+    let groups = group_saves(discover(dir.path(), &lsv), Some(&bg3_grouping()));
+    assert_eq!(
+        summary(&groups),
+        [
+            (Some("Shadow-Heart"), vec!["Camp - 1h 02m", "AutoSave_0"]),
+            (Some("Tav"), vec!["Goblin Camp", "QuickSave_1"]),
+            (None, vec!["Odd.lsv"]),
+        ]
+    );
+    assert_eq!(
+        groups[1].saves[0].file.path,
+        dir.path().join("Tav-333__Goblin Camp/Goblin Camp.lsv")
+    );
+}
+
+#[test]
+fn groups_by_file_stem_and_falls_back_to_file_name() {
+    let dir = tempfile::tempdir().unwrap();
+    touch(&dir.path().join("farm_Ada.json"), b"", 2);
+    touch(&dir.path().join("farm_Bob.json"), b"", 1);
+    let grouping = SaveGrouping {
+        source: GroupingSource::File,
+        pattern: "^(?<group>[a-z]+)_".to_owned(),
+    };
+    let groups = group_saves(discover(dir.path(), &json()), Some(&grouping));
+    assert_eq!(
+        summary(&groups),
+        [(Some("farm"), vec!["farm_Ada.json", "farm_Bob.json"])]
+    );
+}
+
+#[test]
+fn without_grouping_is_one_unnamed_group() {
+    let dir = tempfile::tempdir().unwrap();
+    touch(&dir.path().join("a.json"), b"", 2);
+    touch(&dir.path().join("b.json"), b"", 1);
+    let groups = group_saves(discover(dir.path(), &json()), None);
+    assert_eq!(summary(&groups), [(None, vec!["a.json", "b.json"])]);
+    assert_eq!(group_saves(Vec::new(), None), []);
 }

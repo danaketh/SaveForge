@@ -16,6 +16,8 @@ crates/saveforge-host/        # wasmtime engine, plugin loading, registry, detec
 crates/saveforge-store/       # catalog + cache, downloads, SHA-256, install/update/remove
 crates/saveforge-app/         # iced app (binary `saveforge`): screens, theme, renderer
 sdk/saveforge-sdk/            # guest SDK: Plugin/Document traits, ui builders, form helper, export_plugin!
+libs/lslib/                   # Larian formats (LSPK .pak/.lsv packages, LSF resources), pure Rust port of LSLib, wasm-safe
+plugins/bg3/                  # Baldur's Gate 3 (.lsv via lslib: ability scores + XP in the NewAge blob, save overview; saves grouped by character)
 plugins/planet-crafter/       # Planet Crafter (custom view/update, lossless round-trip)
 plugins/sample-stardew/       # reference schema-driven plugin
 fixtures/test-plugin/         # component used by host/app tests
@@ -29,7 +31,7 @@ Dependency rules:
 saveforge-app    → core, host, store
 saveforge-host   → core, plugin-api
 saveforge-store  → core, host
-plugins/*        → saveforge-sdk only
+plugins/*        → saveforge-sdk only (plus wasm-safe libs/, e.g. lslib)
 ```
 
 ## Commands
@@ -41,6 +43,7 @@ cargo test --workspace                         # all tests (run `cargo xtask plu
 cargo xtask package [-p <id>] [--base-url <url>]   # zips + catalog.json in target/packages
 cargo xtask new-plugin <id> [--name ..] [--ext ..] [--author ..]   # scaffold plugins/<id>
 SAVEFORGE_PC_SAVE=<path> cargo test -p planet-crafter -- --ignored   # real-save test
+SAVEFORGE_BG3_SAVE=<path.lsv> cargo test -p lslib -p bg3 -- --ignored # real-save tests
 ```
 
 The quality gate (CI):
@@ -49,7 +52,7 @@ The quality gate (CI):
 - the wasm clippy line in `.github/workflows/ci.yml`
 - `cargo test --workspace`, `cargo deny check`, `cargo machete`
 
-MSRV is 1.97 and is checked in CI.
+MSRV is 1.97 and is checked in CI. The `MSRV` job reads the toolchain from the workspace `rust-version`, so a bump only touches `Cargo.toml`.
 
 ## Dev mode
 

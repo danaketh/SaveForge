@@ -11,6 +11,8 @@ ignore = [
     { id = "RUSTSEC-2026-0370", reason = "zvariant: via iced_winit/mundy/zbus 5 (Linux), merged into zbus 6, unmaintained only" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names: via iced_winit/mundy/zbus 5 (Linux), merged into zbus 6, unmaintained only" },
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive: via iced_winit/mundy/zbus 5 (Linux), merged into zbus 6, unmaintained only" },
+    { id = "RUSTSEC-2026-0441", reason = "pin-utils: via iced_futures/wasmtimer (wasm32 target only, never built), unmaintained only" },
+    { id = "RUSTSEC-2026-0206", reason = "rustybuzz: via iced svg feature/resvg 0.45/usvg, pinned by iced 0.14, unmaintained only" },
     # zstd 0.13 via wasmtime's compile cache (wasmtime-internal-cache 50.0.1
     # requires `^0.13`; the fixes are in 0.14.3 / zstd-safe 8.2). The cache
     # only calls `encode_all`/`decode_all` on files it wrote into our data

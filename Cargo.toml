@@ -7,6 +7,8 @@ members = [
     "crates/saveforge-plugin-api",
     "crates/saveforge-store",
     "fixtures/test-plugin",
+    "libs/lslib",
+    "plugins/bg3",
     "plugins/planet-crafter",
     "plugins/sample-stardew",
     "sdk/saveforge-sdk",
@@ -21,13 +23,19 @@ publish = false
 
 [workspace.dependencies]
 anyhow = "1.0.104"
+crc32fast = "1.5.3"
 directories = "6.0.0"
 filetime = "0.2.29"
-iced = { version = "0.14.0", features = ["tokio", "image"] }
+flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
+iced = { version = "0.14.0", features = ["tokio", "image", "svg"] }
 iced_test = "0.14.0"
+lslib = { path = "libs/lslib" }
+lz4_flex = "0.14.0"
+md5 = { package = "md-5", version = "0.11.0" }
 open = "5.4.4"
 regex-lite = "0.1.9"
 rfd = "0.17.2"
+ruzstd = "0.9.1"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 saveforge-core = { path = "crates/saveforge-core" }
 saveforge-host = { path = "crates/saveforge-host" }

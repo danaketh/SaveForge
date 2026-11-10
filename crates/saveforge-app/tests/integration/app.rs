@@ -13,7 +13,7 @@ use saveforge_app::documents::{DetectOutcome, Failure, detect_file, open_documen
 use saveforge_app::home::Saves;
 use saveforge_app::render::UiMessage;
 use saveforge_app::{App, Message, Modal, Pending};
-use saveforge_core::discovery::discover;
+use saveforge_core::discovery::{ListedSave, SaveGroup, discover, group_saves};
 use saveforge_core::paths::AppPaths;
 use saveforge_core::settings::AppSettings;
 use saveforge_host::{Event, MAX_FAULTS_PER_SESSION, PluginEntry};
@@ -120,7 +120,10 @@ fn saves_found_for_selected_plugin_only() {
     let world = World::new();
     let mut app = ready_app(&world);
     world.save_file("a.fixture", "x");
-    let saves = discover(&world.dir.path().join("saves"), &[".fixture".to_owned()]);
+    let saves = group_saves(
+        discover(&world.dir.path().join("saves"), &[".fixture".to_owned()]),
+        None,
+    );
     let _ = app.update(Message::SavesFound {
         plugin_id: "other".to_owned(),
         saves: saves.clone(),
@@ -130,7 +133,8 @@ fn saves_found_for_selected_plugin_only() {
         plugin_id: "test-plugin".to_owned(),
         saves,
     });
-    assert!(matches!(&app.home().saves, Saves::Found(s) if s.len() == 1));
+    assert!(matches!(&app.home().saves, Saves::Found(_)));
+    assert_eq!(app.home().saves.count(), 1);
 }
 
 #[test]
@@ -313,11 +317,70 @@ fn repeated_plugin_crashes_disable_the_plugin() {
 }
 
 #[test]
+fn grouped_saves_show_headers_and_fold() {
+    let world = World::new();
+    let mut app = ready_app(&world);
+    let file = |name: &str| {
+        let path = world.save_file(name, "x");
+        discover(path.parent().unwrap(), &[".fixture".to_owned()])
+            .into_iter()
+            .find(|f| f.path == path)
+            .unwrap()
+    };
+    let groups = vec![
+        SaveGroup {
+            name: Some("Tav".to_owned()),
+            saves: vec![ListedSave {
+                label: "Goblin Camp".to_owned(),
+                file: file("a.fixture"),
+            }],
+        },
+        SaveGroup {
+            name: None,
+            saves: vec![ListedSave {
+                label: "b.fixture".to_owned(),
+                file: file("b.fixture"),
+            }],
+        },
+    ];
+    let _ = app.update(Message::SavesFound {
+        plugin_id: "test-plugin".to_owned(),
+        saves: groups,
+    });
+    assert_eq!(app.home().saves.count(), 2);
+    {
+        let mut ui = simulator(app.view());
+        assert!(ui.find("Tav").is_ok());
+        assert!(ui.find("Other").is_ok());
+        assert!(ui.find("Goblin Camp").is_ok());
+        let _ = ui.click("Tav");
+        let messages: Vec<Message> = ui.into_messages().collect();
+        assert!(
+            messages
+                .iter()
+                .any(|m| matches!(m, Message::ToggleSaveGroup(name) if name == "Tav"))
+        );
+    }
+
+    let _ = app.update(Message::ToggleSaveGroup("Tav".to_owned()));
+    {
+        let mut ui = simulator(app.view());
+        assert!(ui.find("Goblin Camp").is_err());
+        assert!(ui.find("b.fixture").is_ok());
+    }
+    let _ = app.update(Message::ToggleSaveGroup("Tav".to_owned()));
+    assert!(simulator(app.view()).find("Goblin Camp").is_ok());
+}
+
+#[test]
 fn view_shows_saves_and_editor_controls() {
     let world = World::new();
     let mut app = ready_app(&world);
     world.save_file("a.fixture", "hello");
-    let saves = discover(&world.dir.path().join("saves"), &[".fixture".to_owned()]);
+    let saves = group_saves(
+        discover(&world.dir.path().join("saves"), &[".fixture".to_owned()]),
+        None,
+    );
     let _ = app.update(Message::SavesFound {
         plugin_id: "test-plugin".to_owned(),
         saves,
